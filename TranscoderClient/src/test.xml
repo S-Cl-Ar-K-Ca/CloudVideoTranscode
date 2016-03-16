@@ -3,7 +3,7 @@
 <!-- description -->
 
 <parameters>
-	<video_bps>200K</video_bps>
+	<video_bps>1500K</video_bps>
 	<video_size>1920*1080</video_size>
 	<frame_rate></frame_rate>
 </parameters>
