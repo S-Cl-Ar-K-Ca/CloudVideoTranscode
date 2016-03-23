@@ -120,6 +120,9 @@ public class TranscodeTask implements Callable<Boolean> {
 		Runtime rt = Runtime.getRuntime();
 		int exit = 0;
 
+		command = hadoop + "fs -rm -r /transcode/" + fileName;
+		exit = callexec(rt, command);
+		
 		command = hadoop + "fs -mkdir -p " + "/transcode/" + fileName + "/split";
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
@@ -197,7 +200,7 @@ public class TranscodeTask implements Callable<Boolean> {
 
 		command = hadoop + "fs -rm -r /transcode/" + fileName + "/trans";
 		exit = callexec(rt, command);
-		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		// println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 
 		// step 06: start transcode, and waiting for its completion.
 		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /transcode/" + fileName + "/index" + " /transcode/"
@@ -213,9 +216,9 @@ public class TranscodeTask implements Callable<Boolean> {
 	 * @return
 	 */
 	private boolean transcode() throws IOException, InterruptedException {
-		String fileFullName = inputPath + fileName;
+		//String fileFullName = inputPath + fileName;
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
-		String command = null;
+		//String command = null;
 		String[] splitList = null;
 		Runtime rt = Runtime.getRuntime();
 

@@ -63,6 +63,9 @@ public class TranscoderMR {
 			int exit = 0;
 
 			try {
+				// step 00: delete the possible file in split path. 
+				TranscodeMapper.deleteFile(localSplitPath + splitName);
+				
 				// step 01: copy a split file to local datanode
 				command = hadoop + "fs -copyToLocal " + splitPath + splitName + " " + localSplitPath;
 				exit = callexec(rt, command);
@@ -71,6 +74,7 @@ public class TranscoderMR {
 				// step 02: transcode the video
 				command = "ffmpeg -y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath
 						+ splitName;
+				System.out.println(command);
 				exit = callexec(rt, command);
 				System.out.println(command + ": " + (exit == 0 ? "Success" : "Fail"));
 

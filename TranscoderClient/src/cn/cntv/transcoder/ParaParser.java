@@ -25,15 +25,15 @@ public class ParaParser {
 				String name = parameter.getName();
 				String value = parameter.getText();
 				if (value.length() > 0) {
-					if (name.intern() == "video_bps".intern()) {
+					if (name.intern() == "video_bps".intern() && !value.trim().isEmpty()) {
 						settings += "-b:v " + value + " ";
 					}
 
-					if (name.intern() == "video_size".intern()) {
+					if (name.intern() == "video_size".intern() && !value.trim().isEmpty()) {
 						settings += "-s " + value + " ";
 					}
 
-					if (name.intern() == "frame_rate".intern()) {
+					if (name.intern() == "frame_rate".intern() && !value.trim().isEmpty()) {
 						settings += "-r " + value + " ";
 					}
 				}
