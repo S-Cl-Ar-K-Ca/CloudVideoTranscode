@@ -3,18 +3,25 @@ package cn.cntv.transcoder;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
-public class TranscodeTask implements Callable<Boolean> {
+public class TranscodeTask implements Callable<String> {
 	private String inputPath;
-	private String fileName;
+	private String originFileName; // original file name, may contain special
+									// characters.
+	private String procesfileName; // currently processing file name.
 	private String outputPath;
 	private String indexPath;
 	private String splitPath;
@@ -28,6 +35,24 @@ public class TranscodeTask implements Callable<Boolean> {
 
 	synchronized private void println(String msg) {
 		System.out.println(msg);
+	}
+
+	public static boolean renameFile(String path, String oldname, String newname) {
+		if (!oldname.equals(newname)) {// 新的文件名和以前文件名不同时,才有必要进行重命名
+			File oldfile = new File(path + oldname);
+			File newfile = new File(path + newname);
+			if (!oldfile.exists()) {
+				return false; // 重命名文件不存在
+			}
+			if (newfile.exists())// 若在该目录下已经有一个文件和新文件名相同，则不允许重命名
+				return false;
+			else {
+				oldfile.renameTo(newfile);
+			}
+		} else {
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -47,6 +72,27 @@ public class TranscodeTask implements Callable<Boolean> {
 		}
 
 		return dir.delete();
+	}
+
+	public static String getLocalIP() {
+		StringBuilder sb = new StringBuilder();
+		try {
+			Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
+			while (en.hasMoreElements()) {
+				NetworkInterface intf = (NetworkInterface) en.nextElement();
+				Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses();
+				while (enumIpAddr.hasMoreElements()) {
+					InetAddress inetAddress = (InetAddress) enumIpAddr.nextElement();
+					if (!inetAddress.isLoopbackAddress() && !inetAddress.isLinkLocalAddress()
+							&& inetAddress.isSiteLocalAddress()) {
+						sb.append(inetAddress.getHostAddress().toString() + "\n");
+					}
+				}
+			}
+		} catch (SocketException e) {
+
+		}
+		return sb.toString();
 	}
 
 	private static boolean clearDir(File dir) {
@@ -86,7 +132,8 @@ public class TranscodeTask implements Callable<Boolean> {
 	public TranscodeTask(String inputPath, String fileName, String outputPath, String indexPath, String splitPath,
 			String transPath, String parameter) {
 		this.inputPath = inputPath;
-		this.fileName = fileName;
+		this.originFileName = fileName;
+		this.procesfileName = "Transcoding_" + TranscodeTask.getLocalIP().trim() + "_" + taskid + ".mp4";
 		this.outputPath = outputPath;
 		this.indexPath = indexPath;
 		this.splitPath = splitPath;
@@ -94,10 +141,10 @@ public class TranscodeTask implements Callable<Boolean> {
 		this.parameter = parameter;
 	}
 
-	public Boolean call() {
-		boolean result = false;
+	public String call() {
+		int code = -1;
 		try {
-			result = transcode();
+			code = transcode();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
@@ -105,31 +152,32 @@ public class TranscodeTask implements Callable<Boolean> {
 		} finally {
 
 		}
-		return result;
+
+		return code == 0?"\n":this.originFileName;
 	}
 
-	private boolean stepClearLocalPath() {
+	private boolean clearLocalPath() {
 		clearDir(new File(indexPath));
 		clearDir(new File(splitPath));
 		return true;
 	}
 
-	private boolean stepPrepareCluster() throws IOException, InterruptedException {
+	private boolean prepareCluster() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
 		int exit = 0;
 
-		command = hadoop + "fs -rm -r /transcode/" + fileName;
+		command = hadoop + "fs -rm -r /transcode/" + procesfileName;
 		exit = callexec(rt, command);
-		
-		command = hadoop + "fs -mkdir -p " + "/transcode/" + fileName + "/split";
+
+		command = hadoop + "fs -mkdir -p " + "/transcode/" + procesfileName + "/split";
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 
-		command = hadoop + "fs -mkdir -p " + "/transcode/" + fileName + "/index";
+		command = hadoop + "fs -mkdir -p " + "/transcode/" + procesfileName + "/index";
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
@@ -138,13 +186,13 @@ public class TranscodeTask implements Callable<Boolean> {
 		return true;
 	}
 
-	private boolean stepSplitVideo() throws IOException, InterruptedException {
-		String fileFullName = inputPath + fileName;
+	private boolean splitVideo() throws IOException, InterruptedException {
+		String fileFullName = inputPath + procesfileName;
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
 		int exit = 0;
 
-		command = "mkvmerge -o " + splitPath + fileName + ".split%04d.mp4 --split 100m " + fileFullName;
+		command = "mkvmerge -o " + splitPath + procesfileName + ".split%04d.mp4 --split 100m " + fileFullName;
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
@@ -166,7 +214,7 @@ public class TranscodeTask implements Callable<Boolean> {
 		return splitList;
 	}
 
-	private boolean stepCopyToCluster(String[] splitList) throws IOException, InterruptedException {
+	private boolean copyToCluster(String[] splitList) throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
@@ -174,15 +222,16 @@ public class TranscodeTask implements Callable<Boolean> {
 
 		for (String splitname : splitList) {
 			// copy the index videos to hadoop cluster
-			command = hadoop + "fs -copyFromLocal -f " + indexPath + splitname + ".idx" + " /transcode/" + fileName
-					+ "/index";
+			command = hadoop + "fs -copyFromLocal -f " + indexPath + splitname + ".idx" + " /transcode/"
+					+ procesfileName + "/index";
 			exit = callexec(rt, command);
 			println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
 
 			// copy the splits videos to hadoop cluster
-			command = hadoop + "fs -copyFromLocal -f " + splitPath + splitname + " /transcode/" + fileName + "/split";
+			command = hadoop + "fs -copyFromLocal -f " + splitPath + splitname + " /transcode/" + procesfileName
+					+ "/split";
 			exit = callexec(rt, command);
 			println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
@@ -198,13 +247,12 @@ public class TranscodeTask implements Callable<Boolean> {
 		Runtime rt = Runtime.getRuntime();
 		int exit = 0;
 
-		command = hadoop + "fs -rm -r /transcode/" + fileName + "/trans";
+		command = hadoop + "fs -rm -r /transcode/" + procesfileName + "/trans";
 		exit = callexec(rt, command);
-		// println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 
 		// step 06: start transcode, and waiting for its completion.
-		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /transcode/" + fileName + "/index" + " /transcode/"
-				+ fileName + "/trans";
+		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /transcode/" + procesfileName + "/index" + " /transcode/"
+				+ procesfileName + "/trans";
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		return exit == 0;
@@ -215,34 +263,49 @@ public class TranscodeTask implements Callable<Boolean> {
 	 * 
 	 * @return
 	 */
-	private boolean transcode() throws IOException, InterruptedException {
-		//String fileFullName = inputPath + fileName;
+	private int transcode() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
-		//String command = null;
 		String[] splitList = null;
 		Runtime rt = Runtime.getRuntime();
 
 		local_tx_lock.lock();
 		try {
-			// step 00: clear index and split directory.
-			boolean step00 = stepClearLocalPath();
-			if (step00 == false)
-				return false;
-			// step 01: prepare work directory on hadoop cluster.
-			boolean step01 = stepPrepareCluster();
-			if (step01 == false)
-				return false;
-			// step 02: use mkvmerge to split the video file.
-			boolean step02 = stepSplitVideo();
-			if (step02 == false)
-				return false;
-			// step 03: scan the splits videos and generate the index files.
+			boolean flag = false;
+			flag = TranscodeTask.renameFile(this.inputPath, this.originFileName, this.procesfileName);
+			if (flag == false)
+				return 1; // can not rename the original video file.
+
+			try {
+				FileOutputStream outTxt = new FileOutputStream(this.outputPath + "transcoding.rec", true);
+				String newline = this.procesfileName + " " + this.originFileName + "\n";
+				outTxt.write(newline.getBytes());
+				outTxt.close();
+			} catch (FileNotFoundException e) {
+				return 2; // can not open and write the transcoding.rec file.
+			}
+
+			// clear index and split directory.
+			flag = clearLocalPath();
+			if (flag == false)
+				return 3; // can not clear the local temporary path.
+
+			// prepare work directory on hadoop cluster.
+			flag = prepareCluster();
+			if (flag == false)
+				return 4; // can not create working directory on hadoop
+
+			// use mkvmerge to split the video file.
+			flag = splitVideo();
+			if (flag == false)
+				return 5; // can not split video
+
+			// scan the splits videos and generate the index files.
 			splitList = stepGenerateIdx();
-			// step 04: copy the index and video files to hadoop cluster index
-			// directory
-			boolean step04 = stepCopyToCluster(splitList);
-			if (step04 == false)
-				return false;
+
+			// copy the index and video files to hadoop cluster
+			flag = copyToCluster(splitList);
+			if (flag == false)
+				return 6; // can not copy files to hadoop
 
 		} finally {
 			local_tx_lock.unlock();
@@ -250,37 +313,41 @@ public class TranscodeTask implements Callable<Boolean> {
 
 		hadoop_lock.lock();
 		try {
-			int retry = 3;
-			boolean step05 = false;
-			for (int i = 0; i <= retry; ++i) {
-				step05 = stepTranscode();
-				if (step05)
-					break;
-			}
-			if (step05 == false)
-				return false;
+			boolean flag = false;
+			flag = stepTranscode();
+			if (flag == false)
+				return 7; // transcoding process on hadoop fails
 		} finally {
 			hadoop_lock.unlock();
 		}
 
 		local_rx_lock.lock();
 		try {
-			// step 07: copy the trans videos to client machine
-			boolean step07 = stepCopyToClient(hadoop, splitList, rt);
-			if (step07 == false)
-				return false;
-			// step 08: scan the tempTransVideoPath path to generate the
-			// out.ffconcat file.
-			stepGenerateConcat();
-			// step 09: assemble all the splits with ffmpeg and put it to the
-			// output directory.
-			boolean step09 = stepAssembleVideo(rt);
-			if (step09 == false)
-				return false;
+			// copy the trans videos to client machine
+			boolean flag = false;
+			flag = copyToClient(hadoop, splitList, rt);
+			if (flag == false)
+				return 8; // can not copy files to local client
+
+			// scan the trans path to generate the out.ffconcat.
+			generateConcat();
+
+			// assemble all the splits with ffmpeg
+			flag = stepAssembleVideo(rt);
+			if (flag == false)
+				return 9; // can not assemble video
+
+			flag = TranscodeTask.renameFile(this.inputPath, this.procesfileName, this.originFileName);
+			if (flag == false)
+				return 9; // can not rename the video file in input path
+
+			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName, this.originFileName);
+			if (flag == false)
+				return 10; // can not rename the video file in output path
 		} finally {
 			local_rx_lock.unlock();
 		}
-		return true;
+		return 0;
 	}
 
 	/**
@@ -292,7 +359,7 @@ public class TranscodeTask implements Callable<Boolean> {
 		String command;
 		int exit;
 		command = "ffmpeg -f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc "
-				+ outputPath + fileName;
+				+ outputPath + procesfileName;
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
@@ -303,7 +370,7 @@ public class TranscodeTask implements Callable<Boolean> {
 	/**
 	 * @throws FileNotFoundException
 	 */
-	private void stepGenerateConcat() throws FileNotFoundException {
+	private void generateConcat() throws FileNotFoundException {
 		File transVideoPath = new File(transPath);
 		PrintWriter outTxt = new PrintWriter(transPath + "out.ffconcat");
 		String[] transList = transVideoPath.list(filter(".*\\.(mp4|xxx)"));
@@ -314,13 +381,13 @@ public class TranscodeTask implements Callable<Boolean> {
 		outTxt.close();
 	}
 
-	private boolean stepCopyToClient(String hadoop, String[] splitList, Runtime rt)
+	private boolean copyToClient(String hadoop, String[] splitList, Runtime rt)
 			throws IOException, InterruptedException {
 		String command;
 		int exit;
 		clearDir(new File(transPath));
 		for (String splitname : splitList) {
-			command = hadoop + "fs -copyToLocal /transcode/" + fileName + "/trans/" + splitname + " " + transPath;
+			command = hadoop + "fs -copyToLocal /transcode/" + procesfileName + "/trans/" + splitname + " " + transPath;
 			exit = callexec(rt, command);
 			println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)

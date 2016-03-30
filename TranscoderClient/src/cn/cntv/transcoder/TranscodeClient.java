@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.*;
 import java.io.*;
@@ -27,7 +28,7 @@ public class TranscodeClient {
 		}
 		return true;
 	}
-	
+
 	public static String replaceBlank(String str) {
 		String dest = "";
 		if (str != null) {
@@ -37,13 +38,13 @@ public class TranscodeClient {
 		}
 		return dest;
 	}
-	
-    public static void makeDir(File dir) {  
-        if(!dir.getParentFile().exists()) {  
-            makeDir(dir.getParentFile());  
-        }  
-        dir.mkdir();  
-    }  
+
+	public static void makeDir(File dir) {
+		if (!dir.getParentFile().exists()) {
+			makeDir(dir.getParentFile());
+		}
+		dir.mkdir();
+	}
 
 	public static FilenameFilter filter(final String regex) {
 		return new FilenameFilter() {
@@ -66,18 +67,24 @@ public class TranscodeClient {
 		// Specify the temp directory that contains the video splits.
 		String splits = output + ".temp/splits/";
 		makeDir(new File(splits));
-		// Specify the temp directory that contains the transcoded video splits.
+		// Specify the temp directory that contains the transcode video splits.
 		String trans = output + ".temp/transc/";
 		makeDir(new File(trans));
 
-		while (true) {
+		File recd = new File(output + "transcoding.rec");
+		if (recd.exists())
+			recd.delete();
+		
+		ArrayList<Future<String>> failList = new ArrayList<Future<String>>();
+
+		for (int loop = 0;; loop++) {
 			// Scan the input directory to find out all video files.
 			File inputFilePath = new File(input);
 			String[] inputList = inputFilePath.list(filter(".*\\.(mp4|xxx)"));
 			// rename the file whose filename has blanks
 			for (String fileName : inputList) {
 				String newFileName = TranscodeClient.replaceBlank(fileName);
-				TranscodeClient.renameFile(input,fileName,newFileName);
+				TranscodeClient.renameFile(input, fileName, newFileName);
 			}
 			inputList = inputFilePath.list(filter(".*\\.(mp4|xxx)"));
 
@@ -88,8 +95,23 @@ public class TranscodeClient {
 
 			List<String> taskFileList = new ArrayList<String>();
 			List<String> outputFileList = Arrays.asList(ouputList);
+			List<String> failFileList = new ArrayList<String>();
+			for (Future<String> failFileName : failList) {
+				try{
+					failFileList.add(failFileName.get());
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			
 			for (String fileName : inputList) {
-				if (!outputFileList.contains(fileName)) {
+				if (outputFileList.contains(fileName)) {
+					if (loop == 0) {
+						System.out.println(fileName + " already exists in output directory!");
+					}
+				} else if (failFileList.contains(fileName)){
+					System.out.println(fileName + " transcode fails!");
+				} else {
 					taskFileList.add(fileName);
 				}
 			}
@@ -101,12 +123,12 @@ public class TranscodeClient {
 				break;
 
 			// Initialize the thread pool.
-			ExecutorService es = Executors.newFixedThreadPool(5);
-					
-			// Transcode videos one by one
+			ExecutorService es = Executors.newFixedThreadPool(3);
+
+			// Transcode videos
 			for (String fileName : taskFileList) {
 				String parameter = ParaParser.parser(new File(args[2]));
-				es.submit(new TranscodeTask(input, fileName, output, index, splits, trans, parameter));
+				failList.add(es.submit(new TranscodeTask(input, fileName, output, index, splits, trans, parameter)));
 			}
 			es.shutdown();
 			try {
