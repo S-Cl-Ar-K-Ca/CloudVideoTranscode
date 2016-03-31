@@ -143,17 +143,23 @@ public class TranscodeTask implements Callable<String> {
 
 	public String call() {
 		int code = -1;
+		boolean flag = false;
 		try {
+			flag = TranscodeTask.renameFile(this.inputPath, this.originFileName, this.procesfileName);
+			if (flag == false)
+				return this.originFileName; // fail,can not rename the original video file.
 			code = transcode();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} finally {
-
+			flag = TranscodeTask.renameFile(this.inputPath, this.procesfileName, this.originFileName);
+			if (flag == false)
+				return this.originFileName; // fail,can not rename the video file in input path
 		}
 
-		return code == 0?"\n":this.originFileName;
+		return code == 0?"":this.originFileName;
 	}
 
 	private boolean clearLocalPath() {
@@ -271,9 +277,6 @@ public class TranscodeTask implements Callable<String> {
 		local_tx_lock.lock();
 		try {
 			boolean flag = false;
-			flag = TranscodeTask.renameFile(this.inputPath, this.originFileName, this.procesfileName);
-			if (flag == false)
-				return 1; // can not rename the original video file.
 
 			try {
 				FileOutputStream outTxt = new FileOutputStream(this.outputPath + "transcoding.rec", true);
@@ -336,10 +339,6 @@ public class TranscodeTask implements Callable<String> {
 			flag = stepAssembleVideo(rt);
 			if (flag == false)
 				return 9; // can not assemble video
-
-			flag = TranscodeTask.renameFile(this.inputPath, this.procesfileName, this.originFileName);
-			if (flag == false)
-				return 9; // can not rename the video file in input path
 
 			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName, this.originFileName);
 			if (flag == false)
