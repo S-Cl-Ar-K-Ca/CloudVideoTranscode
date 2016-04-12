@@ -13,9 +13,12 @@ import org.dom4j.io.SAXReader;
  * 
  */
 public class ParaParser {
+	private static String transcode_parameters = null; 
+	private static String fileout_format = null;
 
-	public static String parser(File inputXml) {
-		String settings = "";
+	public static void parser(File inputXml) {
+		ParaParser.transcode_parameters = "";
+		ParaParser.fileout_format = "";
 		SAXReader saxReader = new SAXReader();
 		try {
 			Document document = saxReader.read(inputXml);
@@ -26,26 +29,36 @@ public class ParaParser {
 				String value = parameter.getText();
 				if (value.length() > 0) {
 					if (name.intern() == "video_bps".intern() && !value.trim().isEmpty()) {
-						settings += "-b:v " + value + " ";
+						transcode_parameters += "-b:v " + value + " ";
 					}
 
 					if (name.intern() == "video_size".intern() && !value.trim().isEmpty()) {
-						settings += "-s " + value + " ";
+						transcode_parameters += "-s " + value + " ";
 					}
 
 					if (name.intern() == "frame_rate".intern() && !value.trim().isEmpty()) {
-						settings += "-r " + value + " ";
+						transcode_parameters += "-r " + value + " ";
 					}
 					
 					if (name.intern() == "video_code".intern() && !value.trim().isEmpty()) {
-						settings += "-c:v " + value + " ";
+						transcode_parameters += "-c:v " + value + " ";
+					}
+					
+					if (name.intern() == "out_format".intern() && !value.trim().isEmpty()) {
+						fileout_format += "." + value;
 					}
 				}
 			}
 		} catch (DocumentException e) {
 			e.printStackTrace();
 		}
-
-		return settings;
+	}
+	
+	public static String getParameter() {
+		return ParaParser.transcode_parameters;
+	}
+	
+	public static String getFileoutFormat() {
+		return ParaParser.fileout_format;
 	}
 }

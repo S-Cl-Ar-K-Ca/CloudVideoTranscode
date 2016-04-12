@@ -71,13 +71,15 @@ public class TranscodeClient {
 		String trans = output + ".temp/transc/";
 		makeDir(new File(trans));
 
-		File recd = new File(output + "transcoding.rec");
+		File recd = new File(output + "log.txt");
 		if (recd.exists())
 			recd.delete();
 		
 		ArrayList<Future<String>> failList = new ArrayList<Future<String>>();
 
 		for (int loop = 0;; loop++) {
+			ParaParser.parser(new File(args[2]));
+			
 			// Scan the input directory to find out all video files.
 			File inputFilePath = new File(input);
 			String[] inputList = inputFilePath.list(filter(".*\\.(mp4|xxx)"));
@@ -91,7 +93,7 @@ public class TranscodeClient {
 			// Check the output directory to find out all successful transcode
 			// videos in order to skip them.
 			File ouputFilePath = new File(output);
-			String[] ouputList = ouputFilePath.list(filter(".*\\.(mp4|xxx)"));
+			String[] ouputList = ouputFilePath.list(filter(".*\\.(mp4|ts)"));
 
 			List<String> taskFileList = new ArrayList<String>();
 			List<String> outputFileList = Arrays.asList(ouputList);
@@ -105,9 +107,11 @@ public class TranscodeClient {
 			}
 			
 			for (String fileName : inputList) {
-				if (outputFileList.contains(fileName)) {
+				String fileNameT = fileName.substring(0, fileName.lastIndexOf("."));
+				fileNameT = fileNameT + ParaParser.getFileoutFormat();
+				if (outputFileList.contains(fileNameT)) {
 					if (loop == 0) {
-						System.out.println(fileName + " already exists in output directory!");
+						System.out.println(fileNameT + "exists! check output path!");
 					}
 				} else if (failFileList.contains(fileName)){
 					System.out.println(fileName + " transcode fails!");
@@ -123,12 +127,15 @@ public class TranscodeClient {
 				break;
 
 			// Initialize the thread pool.
-			ExecutorService es = Executors.newFixedThreadPool(3);
+			ExecutorService es = Executors.newFixedThreadPool(2);
 
 			// Transcode videos
 			for (String fileName : taskFileList) {
-				String parameter = ParaParser.parser(new File(args[2]));
-				failList.add(es.submit(new TranscodeTask(input, fileName, output, index, splits, trans, parameter)));
+				String parameter = ParaParser.getParameter();
+				String outformat = ParaParser.getFileoutFormat();
+				//TranscodeTask task = new TranscodeTask(input, fileName, output, index, splits, trans, parameter, outformat);
+				//task.call();
+				failList.add(es.submit(new TranscodeTask(input, fileName, output, index, splits, trans, parameter, outformat)));
 			}
 			es.shutdown();
 			try {

@@ -27,12 +27,17 @@ public class TranscodeTask implements Callable<String> {
 	private String splitPath;
 	private String transPath;
 	private String parameter;
+	private String outformat;
 	private static int taskcount = 0;
 	private final int taskid = taskcount++;
 	private static ReentrantLock local_tx_lock = new ReentrantLock();
 	private static ReentrantLock local_rx_lock = new ReentrantLock();
 	private static ReentrantLock hadoop_lock = new ReentrantLock();
 
+	synchronized private void print(String msg) {
+		System.out.print(msg);
+	}
+	
 	synchronized private void println(String msg) {
 		System.out.println(msg);
 	}
@@ -130,15 +135,17 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	public TranscodeTask(String inputPath, String fileName, String outputPath, String indexPath, String splitPath,
-			String transPath, String parameter) {
+			String transPath, String parameter, String outformat) {
 		this.inputPath = inputPath;
 		this.originFileName = fileName;
-		this.procesfileName = "Transcoding_" + TranscodeTask.getLocalIP().trim() + "_" + taskid + ".mp4";
+		String filetype = fileName.substring(fileName.lastIndexOf("."), fileName.length());
+		this.procesfileName = "Transcoding_" + TranscodeTask.getLocalIP().trim() + "_" + taskid + filetype;
 		this.outputPath = outputPath;
 		this.indexPath = indexPath;
 		this.splitPath = splitPath;
 		this.transPath = transPath;
 		this.parameter = parameter;
+		this.outformat = outformat;
 	}
 
 	public String call() {
@@ -214,7 +221,7 @@ public class TranscodeTask implements Callable<String> {
 		Arrays.sort(splitList);
 		for (String splitname : splitList) {
 			PrintWriter outTxt = new PrintWriter(indexPath + splitname + ".idx");
-			outTxt.println("file " + splitname + "@" + parameter);
+			outTxt.println("file " + splitname + "@" + this.parameter + "&" + this.outformat);
 			outTxt.close();
 		}
 		return splitList;
@@ -279,12 +286,12 @@ public class TranscodeTask implements Callable<String> {
 			boolean flag = false;
 
 			try {
-				FileOutputStream outTxt = new FileOutputStream(this.outputPath + "transcoding.rec", true);
+				FileOutputStream outTxt = new FileOutputStream(this.outputPath + "log.txt", true);
 				String newline = this.procesfileName + " " + this.originFileName + "\n";
 				outTxt.write(newline.getBytes());
 				outTxt.close();
 			} catch (FileNotFoundException e) {
-				return 2; // can not open and write the transcoding.rec file.
+				return 2; // can not open and write the log.txt file.
 			}
 
 			// clear index and split directory.
@@ -323,6 +330,7 @@ public class TranscodeTask implements Callable<String> {
 		} finally {
 			hadoop_lock.unlock();
 		}
+		
 
 		local_rx_lock.lock();
 		try {
@@ -334,15 +342,19 @@ public class TranscodeTask implements Callable<String> {
 
 			// scan the trans path to generate the out.ffconcat.
 			generateConcat();
-
+			
 			// assemble all the splits with ffmpeg
 			flag = stepAssembleVideo(rt);
 			if (flag == false)
 				return 9; // can not assemble video
 
-			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName, this.originFileName);
+			String originalFileName = this.originFileName.substring(0, this.originFileName.lastIndexOf("."));
+			originalFileName = originalFileName + this.outformat;
+			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName + this.outformat, originalFileName);
 			if (flag == false)
 				return 10; // can not rename the video file in output path
+		} catch (Exception e){
+			e.printStackTrace();
 		} finally {
 			local_rx_lock.unlock();
 		}
@@ -358,10 +370,19 @@ public class TranscodeTask implements Callable<String> {
 		String command;
 		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		int exit;
-		command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc "
-				+ outputPath + procesfileName;
+		if (this.outformat.intern() == ".mp4".intern()) {
+			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc "
+				    + outputPath + this.procesfileName + this.outformat;
+		} else if (this.outformat.intern() == ".ts".intern()) {
+			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy "
+					+ outputPath + this.procesfileName + this.outformat;
+		} else {
+			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy "
+					+ outputPath + this.procesfileName + this.outformat;
+		}
+		print("TaskID:" + this.taskid + " " + command);
 		exit = callexec(rt, command);
-		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		return true;
@@ -373,7 +394,7 @@ public class TranscodeTask implements Callable<String> {
 	private void generateConcat() throws FileNotFoundException {
 		File transVideoPath = new File(transPath);
 		PrintWriter outTxt = new PrintWriter(transPath + "out.ffconcat");
-		String[] transList = transVideoPath.list(filter(".*\\.(mp4|xxx)"));
+		String[] transList = transVideoPath.list(filter(".*\\.(mp4|ts)"));
 		Arrays.sort(transList);
 		for (String filename : transList) {
 			outTxt.println("file " + filename);
@@ -387,9 +408,10 @@ public class TranscodeTask implements Callable<String> {
 		int exit;
 		clearDir(new File(transPath));
 		for (String splitname : splitList) {
-			command = hadoop + "fs -copyToLocal /transcode/" + procesfileName + "/trans/" + splitname + " " + transPath;
+			command = hadoop + "fs -copyToLocal /transcode/" + procesfileName + "/trans/" + splitname + this.outformat + " " + transPath;
+			print("TaskID:" + this.taskid + " " + command);
 			exit = callexec(rt, command);
-			println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+			println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
 		}

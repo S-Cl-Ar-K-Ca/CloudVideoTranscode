@@ -50,7 +50,8 @@ public class TranscoderMR {
 				return;
 
 			String splitName = line.substring(5, line.lastIndexOf("@"));
-			String parameter = line.substring(line.lastIndexOf("@") + 1, line.length());
+			String parameter = line.substring(line.lastIndexOf("@") + 1, line.lastIndexOf("&") );
+			String outformat = line.substring(line.lastIndexOf("&") + 1, line.length());
 
 			System.out.println("start to transcode " + splitName);
 
@@ -74,22 +75,22 @@ public class TranscoderMR {
 
 				// step 02: transcode the video
 				command = ffmpeg + "-y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath
-						+ splitName;
-				System.out.println(command);
+						+ splitName + outformat;
+				System.out.print(command);
 				exit = callexec(rt, command);
-				System.out.println(command + ": " + (exit == 0 ? "Success" : "Fail"));
+				System.out.println(": " + (exit == 0 ? "Success" : "Fail"));
 
 				// step 03: copy the local file back to hdfs
-				command = hadoop + "fs -copyFromLocal -f " + localTransPath + splitName + " " + transPath;
+				command = hadoop + "fs -copyFromLocal -f " + localTransPath + splitName + outformat + " " + transPath;
 				exit = callexec(rt, command);
 				System.out.println(command + ": " + (exit == 0 ? "Success" : "Fail"));
 			} finally {
 				// step 04: delete the local file
 				TranscodeMapper.deleteFile(localSplitPath + splitName);
-				TranscodeMapper.deleteFile(localTransPath + splitName);
+				TranscodeMapper.deleteFile(localTransPath + splitName + outformat);
 			}
-			// context.write(new Text(fileName + "-TranscodeTask"), new
-			// BooleanWritable(true));
+			
+			// context.write(new Text(fileName + "-TranscodeTask"), new BooleanWritable(true));
 		}
 	}
 
