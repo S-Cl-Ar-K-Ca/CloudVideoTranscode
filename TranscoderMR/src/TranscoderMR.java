@@ -44,6 +44,7 @@ public class TranscoderMR {
 
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
 			String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
+			String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 			String line = value.toString();
 			if (line.length() <= 0)
 				return;
@@ -72,7 +73,7 @@ public class TranscoderMR {
 				System.out.println(command + ": " + (exit == 0 ? "Success" : "Fail"));
 
 				// step 02: transcode the video
-				command = "ffmpeg -y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath
+				command = ffmpeg + "-y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath
 						+ splitName;
 				System.out.println(command);
 				exit = callexec(rt, command);

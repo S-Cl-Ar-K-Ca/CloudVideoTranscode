@@ -36,6 +36,10 @@ public class ParaParser {
 					if (name.intern() == "frame_rate".intern() && !value.trim().isEmpty()) {
 						settings += "-r " + value + " ";
 					}
+					
+					if (name.intern() == "video_code".intern() && !value.trim().isEmpty()) {
+						settings += "-c:v " + value + " ";
+					}
 				}
 			}
 		} catch (DocumentException e) {

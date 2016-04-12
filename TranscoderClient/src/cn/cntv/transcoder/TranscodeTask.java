@@ -356,8 +356,9 @@ public class TranscodeTask implements Callable<String> {
 	 */
 	private boolean stepAssembleVideo(Runtime rt) throws IOException, InterruptedException {
 		String command;
+		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		int exit;
-		command = "ffmpeg -f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc "
+		command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc "
 				+ outputPath + procesfileName;
 		exit = callexec(rt, command);
 		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
