@@ -174,6 +174,19 @@ public class TranscodeTask implements Callable<String> {
 		clearDir(new File(splitPath));
 		return true;
 	}
+	
+	private boolean clearCluster() throws IOException, InterruptedException {
+		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
+		String command = null;
+		Runtime rt = Runtime.getRuntime();
+		int exit = 0;
+
+		command = hadoop + "fs -rm -r /transcode/" + procesfileName;
+		print("TaskID:" + this.taskid + " " + command);
+		exit = callexec(rt, command);
+		println(": " + (exit == 0 ? "Success" : "Success")); //print success what ever
+		return true;
+	}
 
 	private boolean prepareCluster() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
@@ -182,17 +195,21 @@ public class TranscodeTask implements Callable<String> {
 		int exit = 0;
 
 		command = hadoop + "fs -rm -r /transcode/" + procesfileName;
+		print("TaskID:" + this.taskid + " " + command);
 		exit = callexec(rt, command);
+		println(": " + (exit == 0 ? "Success" : "Success")); //print success what ever
 
 		command = hadoop + "fs -mkdir -p " + "/transcode/" + procesfileName + "/split";
+		print("TaskID:" + this.taskid + " " + command);
 		exit = callexec(rt, command);
-		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 
 		command = hadoop + "fs -mkdir -p " + "/transcode/" + procesfileName + "/index";
+		print("TaskID:" + this.taskid + " " + command);
 		exit = callexec(rt, command);
-		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 
@@ -206,8 +223,9 @@ public class TranscodeTask implements Callable<String> {
 		int exit = 0;
 
 		command = "mkvmerge -o " + splitPath + procesfileName + ".split%04d.mp4 --split 100m " + fileFullName;
+		print("TaskID:" + this.taskid + " " + command);
 		exit = callexec(rt, command);
-		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 
@@ -237,16 +255,18 @@ public class TranscodeTask implements Callable<String> {
 			// copy the index videos to hadoop cluster
 			command = hadoop + "fs -copyFromLocal -f " + indexPath + splitname + ".idx" + " /transcode/"
 					+ procesfileName + "/index";
+			print("TaskID:" + this.taskid + " " + command);
 			exit = callexec(rt, command);
-			println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+			println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
 
 			// copy the splits videos to hadoop cluster
 			command = hadoop + "fs -copyFromLocal -f " + splitPath + splitname + " /transcode/" + procesfileName
 					+ "/split";
+			print("TaskID:" + this.taskid + " " + command);
 			exit = callexec(rt, command);
-			println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+			println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
 		}
@@ -266,8 +286,9 @@ public class TranscodeTask implements Callable<String> {
 		// step 06: start transcode, and waiting for its completion.
 		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /transcode/" + procesfileName + "/index" + " /transcode/"
 				+ procesfileName + "/trans";
+		print("TaskID:" + this.taskid + " " + command);
 		exit = callexec(rt, command);
-		println("TaskID:" + this.taskid + " " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		println(": " + (exit == 0 ? "Success" : "Fail"));
 		return exit == 0;
 	}
 
@@ -356,6 +377,7 @@ public class TranscodeTask implements Callable<String> {
 		} catch (Exception e){
 			e.printStackTrace();
 		} finally {
+			clearCluster();
 			local_rx_lock.unlock();
 		}
 		return 0;
