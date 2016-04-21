@@ -111,7 +111,7 @@ public class TranscodeClient {
 				fileNameT = fileNameT + ParaParser.getFileoutFormat();
 				if (outputFileList.contains(fileNameT)) {
 					if (loop == 0) {
-						System.out.println(fileNameT + "exists! check output path!");
+						System.out.println(fileNameT + " exists! check output path!");
 					}
 				} else if (failFileList.contains(fileName)){
 					System.out.println(fileName + " transcode fails!");

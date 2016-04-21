@@ -14,6 +14,7 @@ import org.dom4j.io.SAXReader;
  */
 public class ParaParser {
 	private static String transcode_parameters = null; 
+	private static String split_file_size = null;
 	private static String fileout_format = null;
 
 	public static void parser(File inputXml) {
@@ -40,12 +41,36 @@ public class ParaParser {
 						transcode_parameters += "-r " + value + " ";
 					}
 					
+					if (name.intern() == "gop".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-g " + value + " ";
+					}
+					
+					if (name.intern() == "aspect_ratio".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-aspect " + value + " ";
+					}
+					
+					if (name.intern() == "chroma_format".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-pix_fmt " + value + " ";
+					}
+					
 					if (name.intern() == "video_code".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-c:v " + value + " ";
 					}
 					
+					if (name.intern() == "x264_params".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-x264opts " + value + " ";
+					}
+					
+					if (name.intern() == "x265_params".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-x265-params " + value + " ";
+					}
+					
 					if (name.intern() == "out_format".intern() && !value.trim().isEmpty()) {
-						fileout_format += "." + value;
+						fileout_format = "." + value;
+					}
+					
+					if (name.intern() == "split_size".intern() && !value.trim().isEmpty()) {
+						split_file_size = value + " ";
 					}
 				}
 			}
@@ -60,5 +85,9 @@ public class ParaParser {
 	
 	public static String getFileoutFormat() {
 		return ParaParser.fileout_format;
+	}
+	
+	public static String getSplitSize() {
+		return ParaParser.split_file_size;
 	}
 }

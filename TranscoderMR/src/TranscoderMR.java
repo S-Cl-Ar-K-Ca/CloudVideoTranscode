@@ -31,15 +31,35 @@ public class TranscoderMR {
 			return flag;
 		}
 
-		public static int callexec(Runtime rt, String command) throws IOException, InterruptedException {
-			Process process = rt.exec(command);
+		public static int callexec(Runtime rt, String command) {
+/*			Process process = rt.exec(command);
 			BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
 			String message = null;
 			while ((message = br.readLine()) != null) {
 				System.out.println(message);
 			}
 			br.close();
-			return process.waitFor();
+			return process.waitFor();*/
+			
+			Process process = null;
+			int result = -1;
+			try {
+				process = Runtime.getRuntime().exec(command);
+				//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+				new StreamGobbler(process.getErrorStream(),"ERROR").start();
+				new StreamGobbler(process.getInputStream(),"INPUT").start();
+				result = process.waitFor();
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} finally {
+				if(process!=null&&result!=0){
+					process.destroy();
+				}
+			}
+			
+			return result;
 		}
 
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
