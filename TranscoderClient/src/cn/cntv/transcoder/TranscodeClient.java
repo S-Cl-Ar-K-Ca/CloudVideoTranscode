@@ -82,18 +82,18 @@ public class TranscodeClient {
 			
 			// Scan the input directory to find out all video files.
 			File inputFilePath = new File(input);
-			String[] inputList = inputFilePath.list(filter(".*\\.(mp4|xxx)"));
+			String[] inputList = inputFilePath.list(filter(".*\\.(mp4|ts|MP4|TS)"));
 			// rename the file whose filename has blanks
 			for (String fileName : inputList) {
 				String newFileName = TranscodeClient.replaceBlank(fileName);
 				TranscodeClient.renameFile(input, fileName, newFileName);
 			}
-			inputList = inputFilePath.list(filter(".*\\.(mp4|xxx)"));
+			inputList = inputFilePath.list(filter(".*\\.(mp4|ts|MP4|TS)"));
 
 			// Check the output directory to find out all successful transcode
 			// videos in order to skip them.
 			File ouputFilePath = new File(output);
-			String[] ouputList = ouputFilePath.list(filter(".*\\.(mp4|ts)"));
+			String[] ouputList = ouputFilePath.list(filter(".*\\.(mp4|ts|MP4|TS)"));
 
 			List<String> taskFileList = new ArrayList<String>();
 			List<String> outputFileList = Arrays.asList(ouputList);

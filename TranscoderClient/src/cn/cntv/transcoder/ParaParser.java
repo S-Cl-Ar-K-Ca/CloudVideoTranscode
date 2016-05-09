@@ -29,44 +29,64 @@ public class ParaParser {
 				String name = parameter.getName();
 				String value = parameter.getText();
 				if (value.length() > 0) {
-					if (name.intern() == "video_bps".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_bitrate".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-b:v " + value + " ";
+					}
+					
+					if (name.intern() == "video_maxrate".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-maxrate " + value + " ";
+					}
+					
+					if (name.intern() == "video_bufsize".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-bufsize " + value + " ";
 					}
 
 					if (name.intern() == "video_size".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-s " + value + " ";
 					}
 
-					if (name.intern() == "frame_rate".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_frame_rate".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-r " + value + " ";
 					}
 					
-					if (name.intern() == "gop".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_gop".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-g " + value + " ";
 					}
 					
-					if (name.intern() == "aspect_ratio".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_aspect_ratio".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-aspect " + value + " ";
 					}
 					
-					if (name.intern() == "chroma_format".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_chroma_format".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-pix_fmt " + value + " ";
 					}
 					
-					if (name.intern() == "video_code".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_codec".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-c:v " + value + " ";
 					}
 					
-					if (name.intern() == "x264_params".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_x264_params".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-x264opts " + value + " ";
 					}
 					
-					if (name.intern() == "x265_params".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_x265_params".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-x265-params " + value + " ";
 					}
 					
-					if (name.intern() == "out_format".intern() && !value.trim().isEmpty()) {
+					if (name.intern() == "video_out_format".intern() && !value.trim().isEmpty()) {
 						fileout_format = "." + value;
+					}
+					
+					if (name.intern() == "audio_codec".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-c:a " + value + " ";
+					}
+					
+					if (name.intern() == "audio_samplerate".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-ar " + value + " ";
+					}
+					
+					if (name.intern() == "audio_bitrate".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-b:a " + value + " ";
 					}
 					
 					if (name.intern() == "split_size".intern() && !value.trim().isEmpty()) {
