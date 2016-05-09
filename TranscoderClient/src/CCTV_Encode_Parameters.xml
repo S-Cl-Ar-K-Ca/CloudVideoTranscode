@@ -50,4 +50,7 @@
 
     <split_size>100m</split_size>
     <description>云转码时视频文件分割的大小（可以按照文件大小分割也可按照时间长度风格，当按大小分割时建议不小于100m，当按时间分割时建议不小于30秒）</description>
+
+    <output_filename>{original_filename}-{UUID}</output_filename>
+    <description>转码后视频文件的命名方式，{original_filename}-{UUID}表示将转码后文件的命名为原文件名后加横杠和UUID值。{original_filename}-xyz表示将转码后的文件命名为原文件名后加“-xyz”</description>
 </parameters>

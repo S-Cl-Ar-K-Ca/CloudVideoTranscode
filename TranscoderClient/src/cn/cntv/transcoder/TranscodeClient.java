@@ -3,6 +3,7 @@ package cn.cntv.transcoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -93,10 +94,10 @@ public class TranscodeClient {
 			// Check the output directory to find out all successful transcode
 			// videos in order to skip them.
 			File ouputFilePath = new File(output);
-			String[] ouputList = ouputFilePath.list(filter(".*\\.(mp4|ts|MP4|TS)"));
+			String[] outputList = ouputFilePath.list(filter(".*\\.(mp4|ts|MP4|TS)"));
 
 			List<String> taskFileList = new ArrayList<String>();
-			List<String> outputFileList = Arrays.asList(ouputList);
+			List<String> outputFileList = Arrays.asList(outputList);
 			List<String> failFileList = new ArrayList<String>();
 			for (Future<String> failFileName : failList) {
 				try{
@@ -106,14 +107,21 @@ public class TranscodeClient {
 				}
 			}
 			
+			for (int i = 0; i < outputFileList.size(); ++i) {
+				outputFileList.set(i,outputFileList.get(i).replaceAll("[0-9|a-z]{32}", "{UUID}"));
+			}
+			
 			for (String fileName : inputList) {
-				String fileNameT = fileName.substring(0, fileName.lastIndexOf("."));
-				fileNameT = fileNameT + ParaParser.getFileoutFormat();
-				if (outputFileList.contains(fileNameT)) {
+				String input_filename = fileName.substring(0, fileName.lastIndexOf("."));
+				String output_filename = ParaParser.getOutputFilename();
+				output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
+				output_filename = output_filename + ParaParser.getFileoutFormat();
+				
+				if (outputFileList.contains(output_filename)) {
 					if (loop == 0) {
-						System.out.println(fileNameT + " exists! check output path!");
+						System.out.println(output_filename + " exists! check output path!");
 					}
-				} else if (failFileList.contains(fileName)){
+				} else if (failFileList.contains(fileName)) {
 					System.out.println(fileName + " transcode fails!");
 				} else {
 					taskFileList.add(fileName);
@@ -132,10 +140,14 @@ public class TranscodeClient {
 			// Transcode videos
 			for (String fileName : taskFileList) {
 				String parameter = ParaParser.getParameter();
-				String outformat = ParaParser.getFileoutFormat();
-				//TranscodeTask task = new TranscodeTask(input, fileName, output, index, splits, trans, parameter, outformat);
-				//task.call();
-				failList.add(es.submit(new TranscodeTask(input, fileName, output, index, splits, trans, parameter, outformat)));
+				String output_format = ParaParser.getFileoutFormat();
+				String output_filename = ParaParser.getOutputFilename();
+				
+				String input_filename = fileName.substring(0, fileName.lastIndexOf("."));
+				output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
+				output_filename = output_filename.replaceAll("\\{UUID\\}", UUID.randomUUID().toString().replaceAll("-", ""));
+				
+				failList.add(es.submit(new TranscodeTask(input, fileName, output, index, splits, trans, parameter, output_filename, output_format)));
 			}
 			es.shutdown();
 			try {

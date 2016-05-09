@@ -17,14 +17,14 @@ import java.util.regex.Pattern;
 
 public class TranscodeTask implements Callable<String> {
 	private String inputPath;
-	private String originFileName; // original file name, may contain special
-									// characters.
+	private String originFileName; // original file name, may contain special characters.
 	private String procesfileName; // currently processing file name.
 	private String outputPath;
 	private String indexPath;
 	private String splitPath;
 	private String transPath;
 	private String parameter;
+	private String output_filename;
 	private String outformat;
 	private static int taskcount = 0;
 	private final int taskid = taskcount++;
@@ -122,15 +122,6 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	public int callexec(Runtime rt, String command) {
-/*		Process process = rt.exec(command);
-		BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
-		String message = null;
-		while ((message = br.readLine()) != null) {
-			println(message);
-		}
-		br.close();
-		return process.waitFor();*/
-		
 		Process process = null;
 		int result = -1;
 		try {
@@ -153,7 +144,7 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	public TranscodeTask(String inputPath, String fileName, String outputPath, String indexPath, String splitPath,
-			String transPath, String parameter, String outformat) {
+			String transPath, String parameter, String output_filename, String outformat) {
 		this.inputPath = inputPath;
 		this.originFileName = fileName;
 		String filetype = fileName.substring(fileName.lastIndexOf("."), fileName.length());
@@ -163,6 +154,7 @@ public class TranscodeTask implements Callable<String> {
 		this.splitPath = splitPath;
 		this.transPath = transPath;
 		this.parameter = parameter;
+		this.output_filename = output_filename;
 		this.outformat = outformat;
 	}
 
@@ -181,7 +173,7 @@ public class TranscodeTask implements Callable<String> {
 		} finally {
 			flag = TranscodeTask.renameFile(this.inputPath, this.procesfileName, this.originFileName);
 			if (flag == false)
-				return this.originFileName; // fail,can not rename the video file in input path
+				return this.originFileName; // fail,can not rename back the video file in input path
 		}
 
 		return code == 0?"":this.originFileName;
@@ -390,9 +382,8 @@ public class TranscodeTask implements Callable<String> {
 			if (flag == false)
 				return 9; // can not assemble video
 
-			String originalFileName = this.originFileName.substring(0, this.originFileName.lastIndexOf("."));
-			originalFileName = originalFileName + this.outformat;
-			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName + this.outformat, originalFileName);
+			String output_filename = this.output_filename + this.outformat;
+			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName + this.outformat, output_filename);
 			if (flag == false)
 				return 10; // can not rename the video file in output path
 		} catch (Exception e){

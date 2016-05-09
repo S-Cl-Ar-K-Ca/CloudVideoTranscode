@@ -2,6 +2,7 @@ package cn.cntv.transcoder;
 
 import java.io.File;
 import java.util.Iterator;
+import java.util.UUID;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
@@ -16,6 +17,7 @@ public class ParaParser {
 	private static String transcode_parameters = null; 
 	private static String split_file_size = null;
 	private static String fileout_format = null;
+	private static String output_filename = null;
 
 	public static void parser(File inputXml) {
 		ParaParser.transcode_parameters = "";
@@ -92,6 +94,10 @@ public class ParaParser {
 					if (name.intern() == "split_size".intern() && !value.trim().isEmpty()) {
 						split_file_size = value + " ";
 					}
+					
+					if (name.intern() == "output_filename".intern() && !value.trim().isEmpty()) {
+						output_filename = value;
+					}
 				}
 			}
 		} catch (DocumentException e) {
@@ -109,5 +115,9 @@ public class ParaParser {
 	
 	public static String getSplitSize() {
 		return ParaParser.split_file_size;
+	}
+	
+	public static String getOutputFilename() {
+		return ParaParser.output_filename;
 	}
 }
