@@ -15,6 +15,37 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
+enum TRANSCODE_ERROR_CODE {
+	SUCCESS("SUCCESS",0),
+	OPEN_LOG_FILE_FAIL("OPEN_LOG_FILE_FAIL",1), 
+	CLEAR_LOCAL_TEMP_PATH_FAIL("CLEAR_LOCAL_TEMP_PATH_FAIL",2), 
+	CREATE_WORK_PATH_ON_HADOOP_FAIL("CREATE_WORK_PATH_ON_HADOOP_FAIL",3),
+	SPLIT_VIDEO_FAIL("SPLIT_VIDEO_FAIL",4),
+	COPY_FILE_TO_HADOOP_FAIL("COPY_FILE_TO_HADOOP_FAIL",5),
+	TRANSCODE_ON_HADOOP_FAIL("TRANSCODE_ON_HADOOP_FAIL",6),
+	COPY_FILE_TO_LOCAL_FAIL("COPY_FILE_TO_LOCAL_FAIL",7),
+	ASSEMBLE_VIDEO_FAIL("ASSEMBLE_VIDEO_FAIL",8),
+	RENAME_OUTPUT_FILE_FAIL("RENAME_OUTPUT_FILE_FAIL",9);
+	
+	// 成员变量
+    private String name;
+    private int index;
+
+    // 构造方法
+    private TRANSCODE_ERROR_CODE(String name, int index) {
+        this.name = name;
+        this.index = index;
+    }
+
+    public int getIndex() {
+        return index;
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+
 public class TranscodeTask implements Callable<String> {
 	private String inputPath;
 	private String originFileName; // original file name, may contain special characters.
@@ -325,31 +356,36 @@ public class TranscodeTask implements Callable<String> {
 				outTxt.write(newline.getBytes());
 				outTxt.close();
 			} catch (FileNotFoundException e) {
-				return 2; // can not open and write the log.txt file.
+				return TRANSCODE_ERROR_CODE.OPEN_LOG_FILE_FAIL.getIndex(); // can not open and write the log.txt file.
 			}
 
 			// clear index and split directory.
 			flag = clearLocalPath();
-			if (flag == false)
-				return 3; // can not clear the local temporary path.
+			if (flag == false) {
+				return TRANSCODE_ERROR_CODE.CLEAR_LOCAL_TEMP_PATH_FAIL.getIndex(); // can not clear the local temporary path.
+			}
 
 			// prepare work directory on hadoop cluster.
 			flag = prepareCluster();
-			if (flag == false)
-				return 4; // can not create working directory on hadoop
+			if (flag == false) {
+				return TRANSCODE_ERROR_CODE.CREATE_WORK_PATH_ON_HADOOP_FAIL.getIndex(); // can not create working directory on hadoop
+			}
 
 			// use mkvmerge to split the video file.
 			flag = splitVideo();
-			if (flag == false)
-				return 5; // can not split video
+			if (flag == false) {
+				return TRANSCODE_ERROR_CODE.SPLIT_VIDEO_FAIL.getIndex(); // can not split video
+			}
 
 			// scan the splits videos and generate the index files.
 			splitList = stepGenerateIdx();
 
 			// copy the index and video files to hadoop cluster
 			flag = copyToCluster(splitList);
-			if (flag == false)
-				return 6; // can not copy files to hadoop
+			if (flag == false) {
+				clearCluster();
+				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_HADOOP_FAIL.getIndex(); // can not copy files to hadoop
+			}
 
 		} finally {
 			local_tx_lock.unlock();
@@ -359,40 +395,44 @@ public class TranscodeTask implements Callable<String> {
 		try {
 			boolean flag = false;
 			flag = stepTranscode();
-			if (flag == false)
-				return 7; // transcoding process on hadoop fails
+			if (flag == false) {
+				clearCluster();
+				return TRANSCODE_ERROR_CODE.TRANSCODE_ON_HADOOP_FAIL.getIndex(); // transcoding process on hadoop fails
+			}
 		} finally {
 			hadoop_lock.unlock();
 		}
 		
-
 		local_rx_lock.lock();
 		try {
 			// copy the trans videos to client machine
 			boolean flag = false;
 			flag = copyToClient(hadoop, splitList, rt);
-			if (flag == false)
-				return 8; // can not copy files to local client
+			if (flag == false) {
+				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_LOCAL_FAIL.getIndex(); // can not copy files to local client
+			}
 
 			// scan the trans path to generate the out.ffconcat.
 			generateConcat();
 			
 			// assemble all the splits with ffmpeg
 			flag = stepAssembleVideo(rt);
-			if (flag == false)
-				return 9; // can not assemble video
+			if (flag == false) {
+				return TRANSCODE_ERROR_CODE.ASSEMBLE_VIDEO_FAIL.getIndex(); // can not assemble video
+			}
 
 			String output_filename = this.output_filename + this.outformat;
 			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName + this.outformat, output_filename);
-			if (flag == false)
-				return 10; // can not rename the video file in output path
+			if (flag == false) {
+				return TRANSCODE_ERROR_CODE.RENAME_OUTPUT_FILE_FAIL.getIndex(); // can not rename the video file in output path
+			}
 		} catch (Exception e){
 			e.printStackTrace();
 		} finally {
 			clearCluster();
 			local_rx_lock.unlock();
 		}
-		return 0;
+		return TRANSCODE_ERROR_CODE.SUCCESS.getIndex();
 	}
 
 	/**

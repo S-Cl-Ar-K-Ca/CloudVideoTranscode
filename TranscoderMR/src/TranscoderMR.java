@@ -32,19 +32,10 @@ public class TranscoderMR {
 		}
 
 		public static int callexec(Runtime rt, String command) {
-/*			Process process = rt.exec(command);
-			BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
-			String message = null;
-			while ((message = br.readLine()) != null) {
-				System.out.println(message);
-			}
-			br.close();
-			return process.waitFor();*/
-			
 			Process process = null;
 			int result = -1;
 			try {
-				process = Runtime.getRuntime().exec(command);
+				process = rt.exec(command);
 				//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
 				new StreamGobbler(process.getErrorStream(),"ERROR").start();
 				new StreamGobbler(process.getInputStream(),"INPUT").start();

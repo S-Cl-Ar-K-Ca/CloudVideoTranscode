@@ -89,6 +89,8 @@ public class TranscodeClient {
 		String input_path = args[0];
 		// Specify the output directory that contains the transcoding result.
 		String output_path = args[1];
+		// //Read the input parameters
+		ParaParser.parser(new File(args[2])); 
 		// Create the temp directory that contains the index txt.
 		String index = output_path + ".temp/index/";
 		// Specify the username
