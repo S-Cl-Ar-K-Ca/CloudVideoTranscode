@@ -12,7 +12,14 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 public class TranscoderMR {
 	public static class TranscodeMapper extends Mapper<LongWritable, Text, Text, BooleanWritable> {
-
+		// Create a path
+		public static void makeDir(File dir) {
+			if (!dir.getParentFile().exists()) {
+				makeDir(dir.getParentFile());
+			}
+			dir.mkdir();
+		}
+		
 		/**
 		 * 删除单个文件
 		 * 
@@ -60,19 +67,23 @@ public class TranscoderMR {
 			if (line.length() <= 0)
 				return;
 
-			String splitName = line.substring(5, line.lastIndexOf("@"));
-			String parameter = line.substring(line.lastIndexOf("@") + 1, line.lastIndexOf("&") );
-			String outformat = line.substring(line.lastIndexOf("&") + 1, line.length());
+			String splitName = line.substring(0, line.lastIndexOf("@"));
+			String parameter = line.substring(line.lastIndexOf("@") + 1, line.lastIndexOf("&"));
+			String outformat = line.substring(line.lastIndexOf("&") + 1, line.lastIndexOf("$"));
+			String username  = line.substring(line.lastIndexOf("$") + 1, line.length());
 
 			System.out.println("start to transcode " + splitName);
 
 			String fileName = splitName.substring(0, splitName.lastIndexOf(".split"));
-			String splitPath = "/transcode/" + fileName + "/split/";
-			String transPath = "/transcode/" + fileName + "/trans/";
+			String splitPath = "/" + username + "/" + fileName + "/split/";
+			String transPath = "/" + username + "/" + fileName + "/trans/";
 			Runtime rt = Runtime.getRuntime();
 			String command = null;
-			String localSplitPath = "/home/split/";
-			String localTransPath = "/home/trans/";
+			String localSplitPath = "/home/" + username + "/split/";
+			String localTransPath = "/home/" + username + "/trans/";
+			TranscodeMapper.makeDir(new File(localSplitPath));
+			TranscodeMapper.makeDir(new File(localTransPath));
+			
 			int exit = 0;
 
 			try {
@@ -85,8 +96,7 @@ public class TranscoderMR {
 				System.out.println(command + ": " + (exit == 0 ? "Success" : "Fail"));
 
 				// step 02: transcode the video
-				command = ffmpeg + "-y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath
-						+ splitName + outformat;
+				command = ffmpeg + "-y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath + splitName + outformat;
 				System.out.print(command);
 				exit = callexec(rt, command);
 				System.out.println(": " + (exit == 0 ? "Success" : "Fail"));
@@ -100,8 +110,6 @@ public class TranscoderMR {
 				TranscodeMapper.deleteFile(localSplitPath + splitName);
 				TranscodeMapper.deleteFile(localTransPath + splitName + outformat);
 			}
-			
-			// context.write(new Text(fileName + "-TranscodeTask"), new BooleanWritable(true));
 		}
 	}
 

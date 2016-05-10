@@ -187,7 +187,7 @@ public class TranscodeClient {
 					output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
 					output_filename = output_filename.replaceAll("\\{UUID\\}", UUID.randomUUID().toString().replaceAll("-", ""));
 					
-					failTaskList.add(es.submit(new TranscodeTask(input_path, fileName, output_path, index, splits, trans, parameter, output_filename, output_format)));
+					failTaskList.add(es.submit(new TranscodeTask(input_path, fileName, output_path, index, splits, trans, parameter, output_filename, output_format, username)));
 				}
 				es.shutdown();
 				try {
