@@ -54,6 +54,7 @@ public class TranscodeTask implements Callable<String> {
 	private String indexPath;
 	private String splitPath;
 	private String transPath;
+	private String dtshd_path;
 	private String parameter;
 	private String output_filename;
 	private String outformat;
@@ -176,7 +177,7 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	public TranscodeTask(String inputPath, String fileName, String outputPath, String indexPath, String splitPath,
-			String transPath, String parameter, String output_filename, String outformat, String username) {
+			String transPath, String dtshd_path, String parameter, String output_filename, String outformat, String username) {
 		this.inputPath = inputPath;
 		this.originFileName = fileName;
 		String filetype = fileName.substring(fileName.lastIndexOf("."), fileName.length());
@@ -185,6 +186,7 @@ public class TranscodeTask implements Callable<String> {
 		this.indexPath = indexPath;
 		this.splitPath = splitPath;
 		this.transPath = transPath;
+		this.dtshd_path = dtshd_path;
 		this.parameter = parameter;
 		this.output_filename = output_filename;
 		this.outformat = outformat;
@@ -212,13 +214,13 @@ public class TranscodeTask implements Callable<String> {
 		return code == 0?"":this.originFileName;
 	}
 
-	private boolean clearLocalPath() {
+	private boolean clear_local_path() {
 		clearDir(new File(indexPath));
 		clearDir(new File(splitPath));
 		return true;
 	}
 	
-	private boolean clearCluster() throws IOException, InterruptedException {
+	private boolean clear_cluster() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
@@ -231,7 +233,7 @@ public class TranscodeTask implements Callable<String> {
 		return true;
 	}
 
-	private boolean prepareCluster() throws IOException, InterruptedException {
+	private boolean prepare_cluster() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
@@ -259,7 +261,7 @@ public class TranscodeTask implements Callable<String> {
 		return true;
 	}
 
-	private boolean splitVideo() throws IOException, InterruptedException {
+	private boolean split_video() throws IOException, InterruptedException {
 		String fileFullName = inputPath + procesfileName;
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
@@ -275,7 +277,7 @@ public class TranscodeTask implements Callable<String> {
 		return true;
 	}
 
-	private String[] stepGenerateIdx() throws FileNotFoundException {
+	private String[] generate_idx() throws FileNotFoundException {
 		String[] splitList = null;
 		File splitVideoPath = new File(splitPath);
 		splitList = splitVideoPath.list(filter(".*\\.(mp4|xxx)"));
@@ -288,7 +290,7 @@ public class TranscodeTask implements Callable<String> {
 		return splitList;
 	}
 
-	private boolean copyToCluster(String[] splitList) throws IOException, InterruptedException {
+	private boolean copy_to_cluster(String[] splitList) throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
@@ -317,7 +319,7 @@ public class TranscodeTask implements Callable<String> {
 		return true;
 	}
 
-	private boolean stepTranscode() throws IOException, InterruptedException {
+	private boolean transcode_cloud() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
@@ -359,30 +361,30 @@ public class TranscodeTask implements Callable<String> {
 			}
 
 			// clear index and split directory.
-			flag = clearLocalPath();
+			flag = clear_local_path();
 			if (flag == false) {
 				return TRANSCODE_ERROR_CODE.CLEAR_LOCAL_TEMP_PATH_FAIL.getIndex(); // can not clear the local temporary path.
 			}
 
 			// prepare work directory on hadoop cluster.
-			flag = prepareCluster();
+			flag = prepare_cluster();
 			if (flag == false) {
 				return TRANSCODE_ERROR_CODE.CREATE_WORK_PATH_ON_HADOOP_FAIL.getIndex(); // can not create working directory on hadoop
 			}
 
 			// use mkvmerge to split the video file.
-			flag = splitVideo();
+			flag = split_video();
 			if (flag == false) {
 				return TRANSCODE_ERROR_CODE.SPLIT_VIDEO_FAIL.getIndex(); // can not split video
 			}
 
 			// scan the splits videos and generate the index files.
-			splitList = stepGenerateIdx();
+			splitList = generate_idx();
 
 			// copy the index and video files to hadoop cluster
-			flag = copyToCluster(splitList);
+			flag = copy_to_cluster(splitList);
 			if (flag == false) {
-				clearCluster();
+				clear_cluster();
 				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_HADOOP_FAIL.getIndex(); // can not copy files to hadoop
 			}
 
@@ -393,9 +395,9 @@ public class TranscodeTask implements Callable<String> {
 		hadoop_lock.lock();
 		try {
 			boolean flag = false;
-			flag = stepTranscode();
+			flag = transcode_cloud();
 			if (flag == false) {
-				clearCluster();
+				clear_cluster();
 				return TRANSCODE_ERROR_CODE.TRANSCODE_ON_HADOOP_FAIL.getIndex(); // transcoding process on hadoop fails
 			}
 		} finally {
@@ -406,18 +408,25 @@ public class TranscodeTask implements Callable<String> {
 		try {
 			// copy the trans videos to client machine
 			boolean flag = false;
-			flag = copyToClient(hadoop, splitList, rt);
+			flag = copy_to_client(hadoop, splitList, rt);
 			if (flag == false) {
 				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_LOCAL_FAIL.getIndex(); // can not copy files to local client
 			}
 
 			// scan the trans path to generate the out.ffconcat.
-			generateConcat();
+			generate_concat();
 			
 			// assemble all the splits with ffmpeg
-			flag = stepAssembleVideo(rt);
+			flag = assemble_video(rt);
 			if (flag == false) {
 				return TRANSCODE_ERROR_CODE.ASSEMBLE_VIDEO_FAIL.getIndex(); // can not assemble video
+			}
+			
+			// enable DTS audio if needed 
+			if (ParaParser.getAudioDTSEnabled()) {
+				add_audio_dts(rt);
+			} else {
+				// do nothing
 			}
 
 			String output_filename = this.output_filename + this.outformat;
@@ -428,10 +437,87 @@ public class TranscodeTask implements Callable<String> {
 		} catch (Exception e){
 			e.printStackTrace();
 		} finally {
-			clearCluster();
+			clear_cluster();
 			local_rx_lock.unlock();
 		}
 		return TRANSCODE_ERROR_CODE.SUCCESS.getIndex();
+	}
+	
+	private boolean add_audio_dts(Runtime rt) {
+		clearDir(new File(this.dtshd_path));
+		
+		String command;
+		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
+		int exit;
+		
+		// extract the video.h264 to dtshd_path
+		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -bsf:h264_mp4toannexb -f h264 " + this.dtshd_path + "video.h264";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		// extract the audio.ac3 to dtshd_path
+		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -acodec copy -vn " + this.dtshd_path + "audio.ac3";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		// extract the audio.dtshd to dtshd_path
+		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + " -ar 48k -acodec pcm_s24le " + this.dtshd_path + "decode.wav";
+		if (exit != 0)
+			return false;
+		
+		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_L.wav remix 1";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_R.wav remix 2";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_C.wav remix 3";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_LFE.wav remix 4";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_Ls.wav remix 5";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_Rs.wav remix 6";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+
+		command = "DTSEncSimpleConfig --ChCfg7 --LFE --ModeBDPrmLBR –b384000 " + 
+				   this.dtshd_path + "CID_C.wav " + 
+				   this.dtshd_path + "CID_L.wav " + 
+				   this.dtshd_path + "CID_R.wav " +
+				   this.dtshd_path + "CID_Ls.wav " +
+				   this.dtshd_path + "CID_Rs.wav " +
+				   this.dtshd_path + "CID_LFE.wav " +
+				   "--LBRMovieMode --AdaptiveStream --FrameRate1 --StartTC\"00:00:00:00\" --RefTC\"00:00:00:00\" -o" + 
+				   this.dtshd_path + "audio.dtshd";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		// use mp4mux to encapsulate video.h264 audio.ac3 audio.dtshd together
+		command = "mp4mux config.cfg -o " + this.dtshd_path + this.procesfileName + this.outformat + " -t 1 " + this.dtshd_path + "video.h264 " + 
+		                                                                                             " -t 2 " + this.dtshd_path + "audio.ac3 " + 
+				                                                                                     " -t 3 " + this.dtshd_path + "audio.dtshd";
+		exit = callexec(rt,command);
+		if (exit != 0)
+			return false;
+		
+		return true;
 	}
 
 	/**
@@ -439,19 +525,16 @@ public class TranscodeTask implements Callable<String> {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	private boolean stepAssembleVideo(Runtime rt) throws IOException, InterruptedException {
+	private boolean assemble_video(Runtime rt) throws IOException, InterruptedException {
 		String command;
 		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		int exit;
 		if (this.outformat.intern() == ".mp4".intern()) {
-			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc "
-				    + outputPath + this.procesfileName + this.outformat;
+			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc " + transPath + this.procesfileName + this.outformat;
 		} else if (this.outformat.intern() == ".ts".intern()) {
-			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy "
-					+ outputPath + this.procesfileName + this.outformat;
+			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy " + transPath + this.procesfileName + this.outformat;
 		} else {
-			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy "
-					+ outputPath + this.procesfileName + this.outformat;
+			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy " + transPath + this.procesfileName + this.outformat;
 		}
 		
 		exit = callexec(rt, command);
@@ -465,7 +548,7 @@ public class TranscodeTask implements Callable<String> {
 	/**
 	 * @throws FileNotFoundException
 	 */
-	private void generateConcat() throws FileNotFoundException {
+	private void generate_concat() throws FileNotFoundException {
 		File transVideoPath = new File(transPath);
 		PrintWriter outTxt = new PrintWriter(transPath + "out.ffconcat");
 		String[] transList = transVideoPath.list(filter(".*\\.(mp4|ts)"));
@@ -476,7 +559,7 @@ public class TranscodeTask implements Callable<String> {
 		outTxt.close();
 	}
 
-	private boolean copyToClient(String hadoop, String[] splitList, Runtime rt)
+	private boolean copy_to_client(String hadoop, String[] splitList, Runtime rt)
 			throws IOException, InterruptedException {
 		String command;
 		int exit;

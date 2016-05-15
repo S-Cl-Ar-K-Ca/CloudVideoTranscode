@@ -18,6 +18,7 @@ public class ParaParser {
 	private static String split_file_size = null;
 	private static String fileout_format = null;
 	private static String output_filename = null;
+	private static boolean audio_dts_enabled = false;
 
 	public static void parser(File inputXml) {
 		ParaParser.transcode_parameters = "";
@@ -91,6 +92,13 @@ public class ParaParser {
 						transcode_parameters += "-b:a " + value + " ";
 					}
 					
+					if (name.intern() == "audio_dts_enabled".intern() && !value.trim().isEmpty()) {
+						if (value.intern() == "yes".intern())
+							audio_dts_enabled = true;
+						else if (value.intern() == "no".intern())
+							audio_dts_enabled = false;
+					}
+					
 					if (name.intern() == "split_size".intern() && !value.trim().isEmpty()) {
 						split_file_size = value + " ";
 					}
@@ -119,5 +127,9 @@ public class ParaParser {
 	
 	public static String getOutputFilename() {
 		return ParaParser.output_filename;
+	}
+	
+	public static boolean getAudioDTSEnabled() {
+		return ParaParser.audio_dts_enabled;
 	}
 }

@@ -48,6 +48,9 @@
     <audio_bitrate>256k</audio_bitrate>
     <description>音频编码码率</description>
 
+    <audio_dts_enabled>yes</audio_dts_enabled>
+    <description>是否支持DTS音效：yes-支持，no-不支持</description>
+
     <split_size>100m</split_size>
     <description>云转码时视频文件分割的大小（可以按照文件大小分割也可按照时间长度风格，当按大小分割时建议不小于100m，当按时间分割时建议不小于30秒）</description>
 

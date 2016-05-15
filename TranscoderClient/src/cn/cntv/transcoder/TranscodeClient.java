@@ -13,7 +13,7 @@ import java.io.*;
 import java.lang.Thread;
 
 enum TRANSCODECLIENT_STATUS {
-	START("START",1), TRANSCODING("TRANSCODING",2), WAITING("WAITING",3);
+	START("START",1), TRANSCODING("TRANSCODING",2), WAITING("WAITING",3), ENDING("ENDING",4);
 	// 成员变量
     private String name;
     private int index;
@@ -92,17 +92,20 @@ public class TranscodeClient {
 		// //Read the input parameters
 		ParaParser.parser(new File(args[2])); 
 		// Create the temp directory that contains the index txt.
-		String index = output_path + ".temp/index/";
+		String index_path = output_path + ".temp/index/";
 		// Specify the username
 		String username = args[3];
 		
-		makeDir(new File(index));
+		makeDir(new File(index_path));
 		// Specify the temp directory that contains the video splits.
-		String splits = output_path + ".temp/splits/";
-		makeDir(new File(splits));
+		String splits_path = output_path + ".temp/splits/";
+		makeDir(new File(splits_path));
 		// Specify the temp directory that contains the transcode video splits.
-		String trans = output_path + ".temp/transc/";
-		makeDir(new File(trans));
+		String trans_path = output_path + ".temp/transc/";
+		makeDir(new File(trans_path));
+		// Specify the dtshd path that is used to add dts audio.
+		String dtshd_path = output_path + ".temp/dtshd/";
+		makeDir(new File(dtshd_path));
 
 		File recd = new File(output_path + "log.txt");
 		if (recd.exists())
@@ -187,7 +190,7 @@ public class TranscodeClient {
 					output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
 					output_filename = output_filename.replaceAll("\\{UUID\\}", UUID.randomUUID().toString().replaceAll("-", ""));
 					
-					failTaskList.add(es.submit(new TranscodeTask(input_path, fileName, output_path, index, splits, trans, parameter, output_filename, output_format, username)));
+					failTaskList.add(es.submit(new TranscodeTask(input_path, fileName, output_path, index_path, splits_path, trans_path, dtshd_path, parameter, output_filename, output_format, username)));
 				}
 				es.shutdown();
 				try {
@@ -265,7 +268,7 @@ public class TranscodeClient {
 				}
 				
 				if (taskFileList.isEmpty()) {
-					status = TRANSCODECLIENT_STATUS.WAITING;
+					status = TRANSCODECLIENT_STATUS.ENDING;
 					flag = false;
 					try {
 						Thread.sleep(10000);
@@ -277,6 +280,9 @@ public class TranscodeClient {
 				}
 				
 				break;
+				
+			case ENDING:
+				return;
 			}
 		}
 	}
