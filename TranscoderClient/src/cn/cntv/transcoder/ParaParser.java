@@ -18,6 +18,7 @@ public class ParaParser {
 	private static String split_file_size = null;
 	private static String fileout_format = null;
 	private static String output_filename = null;
+	private static String video_codec_type = null;
 	private static boolean audio_dts_enabled = false;
 
 	public static void parser(File inputXml) {
@@ -66,6 +67,7 @@ public class ParaParser {
 					
 					if (name.intern() == "video_codec".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-c:v " + value + " ";
+						video_codec_type = value;
 					}
 					
 					if (name.intern() == "video_x264_params".intern() && !value.trim().isEmpty()) {
@@ -131,5 +133,9 @@ public class ParaParser {
 	
 	public static boolean getAudioDTSEnabled() {
 		return ParaParser.audio_dts_enabled;
+	}
+	
+	public static String getVideoCodecType() {
+		return ParaParser.video_codec_type;
 	}
 }

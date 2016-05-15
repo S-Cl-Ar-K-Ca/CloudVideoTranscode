@@ -27,17 +27,17 @@
     <video_aspect_ratio>16:9</video_aspect_ratio>
     <description>视频的宽高比</description>
 
-    <video_codec>libx265</video_codec>
+    <video_codec>libx264</video_codec>
     <description>视频编码器（libx264/libx265/hevc,其中hevc与libx265等价）</description>
 
-    <video_x264_params></video_x264_params>
+    <video_x264_params>bframes=3</video_x264_params>
     <description>视频编码器参数（当video_codec设置为libx264时才可能需要设置此参数，当video_codec不为libx264时留空）</description>
 
-    <video_x265_params>bframe=3:keyint=50</video_x265_params>
-    <description>视频编码器参数（当video_codec设置为libx265时才可能需要设置此参数，当video_codec不为libx265时留空）</description>
+    <video_x265_params></video_x265_params>
+    <description>视频编码器参数（当video_codec设置为libx265时才可能需要设置此参数，当video_codec不为libx265时留空,例子：bframe=3:keyint=50）</description>
 
-    <video_out_format>ts</video_out_format>
-    <description>转码后视频文件的封装格式</description>
+    <video_out_format>mp4</video_out_format>
+    <description>转码后视频文件的封装格式:mp4/ts</description>
 
     <audio_codec>ac3</audio_codec>
     <description>音频格式</description>
@@ -48,10 +48,10 @@
     <audio_bitrate>256k</audio_bitrate>
     <description>音频编码码率</description>
 
-    <audio_dts_enabled>no</audio_dts_enabled>
+    <audio_dts_enabled>yes</audio_dts_enabled>
     <description>是否支持DTS音效：yes-支持，no-不支持</description>
 
-    <split_size>100m</split_size>
+    <split_size>30s</split_size>
     <description>云转码时视频文件分割的大小（可以按照文件大小分割也可按照时间长度风格，当按大小分割时建议不小于100m，当按时间分割时建议不小于30秒）</description>
 
     <output_filename>{original_filename}-{UUID}</output_filename>

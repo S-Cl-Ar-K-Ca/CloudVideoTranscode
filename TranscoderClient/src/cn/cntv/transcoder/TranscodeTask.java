@@ -424,7 +424,7 @@ public class TranscodeTask implements Callable<String> {
 			
 			// enable DTS audio if needed 
 			if (ParaParser.getAudioDTSEnabled()) {
-				add_audio_dts(rt);
+				enable_audio_dts(rt);
 			} else {
 				// do nothing
 			}
@@ -443,15 +443,33 @@ public class TranscodeTask implements Callable<String> {
 		return TRANSCODE_ERROR_CODE.SUCCESS.getIndex();
 	}
 	
-	private boolean add_audio_dts(Runtime rt) {
+	private boolean enable_audio_dts(Runtime rt) {
 		clearDir(new File(this.dtshd_path));
 		
 		String command;
 		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		int exit;
 		
-		// extract the video.h264 to dtshd_path
-		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -bsf:h264_mp4toannexb -f h264 " + this.dtshd_path + "video.h264";
+		// extract the video stream to dtshd_path
+		if (ParaParser.getVideoCodecType().intern() == "libx264".intern()) {
+			if (this.outformat.intern() == ".mp4".intern()) {
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -bsf: h264_mp4toannexb -f h264 " + this.dtshd_path + "video.h264";
+			} else if (this.outformat.intern() == ".ts".intern()) {
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f h264 " + this.dtshd_path + "video.h264";
+			} else {
+				command = "nothing";
+			}
+		} else if (ParaParser.getVideoCodecType().intern() == "libx265".intern()) {
+			if (this.outformat.intern() == ".mp4".intern()) {
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.hevc";
+			} else if (this.outformat.intern() == ".ts".intern()) {
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.hevc";
+			} else {
+				command = "nothing";
+			}
+		} else {
+			command = "nothing";
+		}
 		exit = callexec(rt,command);
 		if (exit != 0)
 			return false;
