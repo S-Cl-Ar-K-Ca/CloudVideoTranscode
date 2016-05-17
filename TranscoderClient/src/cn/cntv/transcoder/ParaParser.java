@@ -86,6 +86,10 @@ public class ParaParser {
 						transcode_parameters += "-c:a " + value + " ";
 					}
 					
+					if (name.intern() == "audio_channel".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-ac " + value + " ";
+					}
+					
 					if (name.intern() == "audio_samplerate".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-ar " + value + " ";
 					}

@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -25,7 +26,9 @@ enum TRANSCODE_ERROR_CODE {
 	TRANSCODE_ON_HADOOP_FAIL("TRANSCODE_ON_HADOOP_FAIL",6),
 	COPY_FILE_TO_LOCAL_FAIL("COPY_FILE_TO_LOCAL_FAIL",7),
 	ASSEMBLE_VIDEO_FAIL("ASSEMBLE_VIDEO_FAIL",8),
-	RENAME_OUTPUT_FILE_FAIL("RENAME_OUTPUT_FILE_FAIL",9);
+	RENAME_OUTPUT_FILE_FAIL("RENAME_OUTPUT_FILE_FAIL",9),
+	ENABLE_DTS_FAIL("ENABLE_DTS_FAIL",10),
+	MOVE_TO_OUTPUT_PATH_FAIL("MOVE_TO_OUTPUT_PATH_FAIL",11);
 	
 	// 成员变量
     private String name;
@@ -153,6 +156,28 @@ public class TranscodeTask implements Callable<String> {
 			}
 		};
 	}
+	
+	public int callexec(Runtime rt, String command, OutputStream outputStream) {
+		Process process = null;
+		int result = -1;
+		try {
+			process = rt.exec(command);
+			//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+			new StreamGobbler(process.getErrorStream(),"ERROR", outputStream).start();
+			new StreamGobbler(process.getInputStream(),"INPUT", outputStream).start();
+			result = process.waitFor();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+			if(process!=null&&result!=0){
+				process.destroy();
+			}
+		}
+		
+		return result;
+	}
 
 	public int callexec(Runtime rt, String command) {
 		Process process = null;
@@ -228,7 +253,7 @@ public class TranscodeTask implements Callable<String> {
 
 		command = hadoop + "fs -rm -r /" + this.username + "/" + procesfileName;
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Success")); //print success what ever
 		return true;
 	}
@@ -241,19 +266,19 @@ public class TranscodeTask implements Callable<String> {
 
 		command = hadoop + "fs -rm -r /" + this.username + "/" + procesfileName;
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Success")); //print success what ever
 
 		command = hadoop + "fs -mkdir -p /" + this.username + "/" + procesfileName + "/split";
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 
 		command = hadoop + "fs -mkdir -p /" + this.username + "/" + procesfileName + "/index";
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
@@ -262,14 +287,16 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	private boolean split_video() throws IOException, InterruptedException {
-		String fileFullName = inputPath + procesfileName;
+		String fileFullName = this.inputPath + this.procesfileName;
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
 		int exit = 0;
-
-		command = "mkvmerge -o " + splitPath + procesfileName + ".split%04d.mp4 --split " + ParaParser.getSplitSize() + fileFullName;
+		
+		String file_type = this.procesfileName.substring(this.procesfileName.lastIndexOf("."),this.procesfileName.length());
+		
+		command = "mkvmerge -o " + this.splitPath + this.procesfileName + ".split%04d" + file_type + " --split " + ParaParser.getSplitSize() + fileFullName;
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
@@ -301,8 +328,8 @@ public class TranscodeTask implements Callable<String> {
 			command = hadoop + "fs -copyFromLocal -f " + indexPath + splitname + ".idx /" + this.username + "/" + procesfileName + "/index";
 			
 			exit = callexec(rt, command);
-			print("TaskID:" + this.taskid + " " + command);
-			println(": " + (exit == 0 ? "Success" : "Fail"));
+			//print("TaskID=" + this.taskid + ": " + command);
+			//println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
 
@@ -310,7 +337,7 @@ public class TranscodeTask implements Callable<String> {
 			command = hadoop + "fs -copyFromLocal -f " + splitPath + splitname + " /" + this.username + "/" + procesfileName + "/split";
 			
 			exit = callexec(rt, command);
-			print("TaskID:" + this.taskid + " " + command);
+			print("TaskID=" + this.taskid + ": " + command);
 			println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
@@ -332,7 +359,7 @@ public class TranscodeTask implements Callable<String> {
 		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /" + this.username + "/" + procesfileName + "/index /" + this.username + "/" + procesfileName + "/trans";
 		
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
 		return exit == 0;
 	}
@@ -345,6 +372,8 @@ public class TranscodeTask implements Callable<String> {
 	private int transcode() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String[] splitList = null;
+		String command = null;
+		int exit;
 		Runtime rt = Runtime.getRuntime();
 
 		local_tx_lock.lock();
@@ -424,16 +453,43 @@ public class TranscodeTask implements Callable<String> {
 			
 			// enable DTS audio if needed 
 			if (ParaParser.getAudioDTSEnabled()) {
-				enable_audio_dts(rt);
+				flag = enable_audio_dts(rt);
+				if (flag == false) {
+					return TRANSCODE_ERROR_CODE.ENABLE_DTS_FAIL.getIndex(); // enable dts fail
+				}
 			} else {
 				// do nothing
 			}
 
+			// move the final result file to the output path and rename it
 			String output_filename = this.output_filename + this.outformat;
-			flag = TranscodeTask.renameFile(this.outputPath, this.procesfileName + this.outformat, output_filename);
-			if (flag == false) {
-				return TRANSCODE_ERROR_CODE.RENAME_OUTPUT_FILE_FAIL.getIndex(); // can not rename the video file in output path
+			//String prepath = ParaParser.getAudioDTSEnabled()?this.dtshd_path:this.transPath;
+			String move_filename1 = this.transPath + this.procesfileName + this.outformat;
+			String move_filename2 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4";
+			String move_filename3 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4.ts";
+			
+			command = "mv " + move_filename1 + " " + this.outputPath + output_filename;
+			exit = callexec(rt,command);
+			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+			if (exit != 0) {
+				return TRANSCODE_ERROR_CODE.RENAME_OUTPUT_FILE_FAIL.getIndex();
 			}
+			
+			command = "mv " + move_filename2 + " " + this.outputPath + this.output_filename + "_DTS51.mp4";
+			exit = callexec(rt,command);
+			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+			if (exit != 0) {
+				return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
+			}
+			
+			/*
+			command = "mv " + move_filename3 + " " + this.outputPath + this.output_filename + "_DTS51.ts";
+			exit = callexec(rt,command);
+			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+			if (exit != 0) {
+				return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
+			}
+			*/
 		} catch (Exception e){
 			e.printStackTrace();
 		} finally {
@@ -446,6 +502,37 @@ public class TranscodeTask implements Callable<String> {
 	private boolean enable_audio_dts(Runtime rt) {
 		clearDir(new File(this.dtshd_path));
 		
+		String command = null;
+		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
+		String python = "python3 ";
+		int exit;
+		
+		// extract the audio wave file to dtshd path
+		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + " -ar 48k -acodec pcm_s24le " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".wav";
+		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		if (exit != 0)
+			return false;
+		
+		// copy the video file to dtshd path 
+		//String file_name = this.procesfileName.substring(0, this.procesfileName.lastIndexOf("."));
+		//String file_type = this.procesfileName.substring(this.procesfileName.lastIndexOf("."),this.procesfileName.length());
+		
+		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -c:v copy -c:a copy " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4";
+		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		if (exit != 0)
+			return false;
+		
+		// call the python script to add DTS track
+		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4"/* + " -ts"*/;
+		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+		if (exit != 0)
+			return false;
+		
+		return true;
+		/*
 		String command;
 		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		int exit;
@@ -453,7 +540,7 @@ public class TranscodeTask implements Callable<String> {
 		// extract the video stream to dtshd_path
 		if (ParaParser.getVideoCodecType().intern() == "libx264".intern()) {
 			if (this.outformat.intern() == ".mp4".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -bsf: h264_mp4toannexb -f h264 " + this.dtshd_path + "video.h264";
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -bsf:v h264_mp4toannexb -f h264 " + this.dtshd_path + "video.h264";
 			} else if (this.outformat.intern() == ".ts".intern()) {
 				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f h264 " + this.dtshd_path + "video.h264";
 			} else {
@@ -461,81 +548,112 @@ public class TranscodeTask implements Callable<String> {
 			}
 		} else if (ParaParser.getVideoCodecType().intern() == "libx265".intern()) {
 			if (this.outformat.intern() == ".mp4".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.hevc";
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.h265";
 			} else if (this.outformat.intern() == ".ts".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.hevc";
+				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.h265";
 			} else {
 				command = "nothing";
 			}
 		} else {
 			command = "nothing";
 		}
+		
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		// extract the audio.ac3 to dtshd_path
 		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -acodec copy -vn " + this.dtshd_path + "audio.ac3";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		// extract the audio.dtshd to dtshd_path
 		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + " -ar 48k -acodec pcm_s24le " + this.dtshd_path + "decode.wav";
+		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_L.wav remix 1";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_R.wav remix 2";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_C.wav remix 3";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_LFE.wav remix 4";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_Ls.wav remix 5";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_Rs.wav remix 6";
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 
-		command = "DTSEncSimpleConfig --ChCfg7 --LFE --ModeBDPrmLBR –b384000 " + 
+		String timecode = "00:00:00:00";
+		command = "/opt/dts/DTSEncSimpleConfig --ChCfg7 --LFE --ModeBDPrmLBR -b384000 " + 
 				   this.dtshd_path + "CID_C.wav " + 
 				   this.dtshd_path + "CID_L.wav " + 
 				   this.dtshd_path + "CID_R.wav " +
 				   this.dtshd_path + "CID_Ls.wav " +
 				   this.dtshd_path + "CID_Rs.wav " +
 				   this.dtshd_path + "CID_LFE.wav " +
-				   "--LBRMovieMode --AdaptiveStream --FrameRate1 --StartTC\"00:00:00:00\" --RefTC\"00:00:00:00\" -o" + 
-				   this.dtshd_path + "audio.dtshd";
+				   "--LBRMovieMode --AdaptiveStream --FrameRate1 --StartTC" + timecode + " --RefTC" + timecode + " -o" + 
+				   this.dtshd_path + "audio";
+		
 		exit = callexec(rt,command);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
+		
 		// use mp4mux to encapsulate video.h264 audio.ac3 audio.dtshd together
-		command = "mp4mux config.cfg -o " + this.dtshd_path + this.procesfileName + this.outformat + " -t 1 " + this.dtshd_path + "video.h264 " + 
-		                                                                                             " -t 2 " + this.dtshd_path + "audio.ac3 " + 
-				                                                                                     " -t 3 " + this.dtshd_path + "audio.dtshd";
-		exit = callexec(rt,command);
+		String video_file_name = null;
+		if (ParaParser.getVideoCodecType().intern() == "libx264".intern()) {
+			video_file_name = "video.h264";
+		} else if (ParaParser.getVideoCodecType().intern() == "libx265".intern()) {
+			video_file_name = "video.h265";
+		} else {
+			// do nothing
+		}
+		
+		if (this.outformat.intern() == ".mp4".intern()) {
+			command = "mp4mux /home/bin/config.cfg -o " + this.dtshd_path + this.procesfileName + this.outformat + 
+					  " -t 1 " + this.dtshd_path + video_file_name + 
+		              " -t 2 " + this.dtshd_path + "audio.ac3" + 
+				      " -t 3 " + this.dtshd_path + "audio.dtshd";
+		} else if (this.outformat.intern() == ".ts".intern()) {
+			command = "TODO"; //TODO
+		}
+		exit = callexec(rt,command,System.out);
+		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
 		
 		return true;
+		*/
 	}
 
 	/**
@@ -556,7 +674,7 @@ public class TranscodeTask implements Callable<String> {
 		}
 		
 		exit = callexec(rt, command);
-		print("TaskID:" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + " " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
@@ -586,7 +704,7 @@ public class TranscodeTask implements Callable<String> {
 			command = hadoop + "fs -copyToLocal /" + this.username + "/" + procesfileName + "/trans/" + splitname + this.outformat + " " + transPath;
 			
 			exit = callexec(rt, command);
-			print("TaskID:" + this.taskid + " " + command);
+			print("TaskID=" + this.taskid + " " + command);
 			println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
