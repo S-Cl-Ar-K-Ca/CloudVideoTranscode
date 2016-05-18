@@ -463,7 +463,7 @@ public class TranscodeTask implements Callable<String> {
 
 			// move the final result file to the output path and rename it
 			String output_filename = this.output_filename + this.outformat;
-			//String prepath = ParaParser.getAudioDTSEnabled()?this.dtshd_path:this.transPath;
+			
 			String move_filename1 = this.transPath + this.procesfileName + this.outformat;
 			String move_filename2 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4";
 			String move_filename3 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4.ts";
@@ -482,14 +482,13 @@ public class TranscodeTask implements Callable<String> {
 				return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
 			}
 			
-			/*
 			command = "mv " + move_filename3 + " " + this.outputPath + this.output_filename + "_DTS51.ts";
 			exit = callexec(rt,command);
 			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0) {
 				return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
 			}
-			*/
+			
 		} catch (Exception e){
 			e.printStackTrace();
 		} finally {
@@ -522,7 +521,7 @@ public class TranscodeTask implements Callable<String> {
 			return false;
 		
 		// call the python script to add DTS track
-		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4"/* + " -ts"*/;
+		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4 -ts";
 		exit = callexec(rt,command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
@@ -549,7 +548,7 @@ public class TranscodeTask implements Callable<String> {
 		}
 		
 		exit = callexec(rt, command);
-		print("TaskID=" + this.taskid + " " + command);
+		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
