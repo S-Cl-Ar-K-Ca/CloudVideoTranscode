@@ -515,9 +515,6 @@ public class TranscodeTask implements Callable<String> {
 			return false;
 		
 		// copy the video file to dtshd path 
-		//String file_name = this.procesfileName.substring(0, this.procesfileName.lastIndexOf("."));
-		//String file_type = this.procesfileName.substring(this.procesfileName.lastIndexOf("."),this.procesfileName.length());
-		
 		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -c:v copy -c:a copy " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4";
 		exit = callexec(rt,command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
@@ -532,128 +529,6 @@ public class TranscodeTask implements Callable<String> {
 			return false;
 		
 		return true;
-		/*
-		String command;
-		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
-		int exit;
-		
-		// extract the video stream to dtshd_path
-		if (ParaParser.getVideoCodecType().intern() == "libx264".intern()) {
-			if (this.outformat.intern() == ".mp4".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -bsf:v h264_mp4toannexb -f h264 " + this.dtshd_path + "video.h264";
-			} else if (this.outformat.intern() == ".ts".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f h264 " + this.dtshd_path + "video.h264";
-			} else {
-				command = "nothing";
-			}
-		} else if (ParaParser.getVideoCodecType().intern() == "libx265".intern()) {
-			if (this.outformat.intern() == ".mp4".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.h265";
-			} else if (this.outformat.intern() == ".ts".intern()) {
-				command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -vcodec copy -an -f hevc " + this.dtshd_path + "video.h265";
-			} else {
-				command = "nothing";
-			}
-		} else {
-			command = "nothing";
-		}
-		
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		// extract the audio.ac3 to dtshd_path
-		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -acodec copy -vn " + this.dtshd_path + "audio.ac3";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		// extract the audio.dtshd to dtshd_path
-		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + " -ar 48k -acodec pcm_s24le " + this.dtshd_path + "decode.wav";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_L.wav remix 1";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_R.wav remix 2";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_C.wav remix 3";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_LFE.wav remix 4";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_Ls.wav remix 5";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		command = "sox --ignore-length " + this.dtshd_path + "decode.wav " +  this.dtshd_path + "CID_Rs.wav remix 6";
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-
-		String timecode = "00:00:00:00";
-		command = "/opt/dts/DTSEncSimpleConfig --ChCfg7 --LFE --ModeBDPrmLBR -b384000 " + 
-				   this.dtshd_path + "CID_C.wav " + 
-				   this.dtshd_path + "CID_L.wav " + 
-				   this.dtshd_path + "CID_R.wav " +
-				   this.dtshd_path + "CID_Ls.wav " +
-				   this.dtshd_path + "CID_Rs.wav " +
-				   this.dtshd_path + "CID_LFE.wav " +
-				   "--LBRMovieMode --AdaptiveStream --FrameRate1 --StartTC" + timecode + " --RefTC" + timecode + " -o" + 
-				   this.dtshd_path + "audio";
-		
-		exit = callexec(rt,command);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		// use mp4mux to encapsulate video.h264 audio.ac3 audio.dtshd together
-		String video_file_name = null;
-		if (ParaParser.getVideoCodecType().intern() == "libx264".intern()) {
-			video_file_name = "video.h264";
-		} else if (ParaParser.getVideoCodecType().intern() == "libx265".intern()) {
-			video_file_name = "video.h265";
-		} else {
-			// do nothing
-		}
-		
-		if (this.outformat.intern() == ".mp4".intern()) {
-			command = "mp4mux /home/bin/config.cfg -o " + this.dtshd_path + this.procesfileName + this.outformat + 
-					  " -t 1 " + this.dtshd_path + video_file_name + 
-		              " -t 2 " + this.dtshd_path + "audio.ac3" + 
-				      " -t 3 " + this.dtshd_path + "audio.dtshd";
-		} else if (this.outformat.intern() == ".ts".intern()) {
-			command = "TODO"; //TODO
-		}
-		exit = callexec(rt,command,System.out);
-		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-		if (exit != 0)
-			return false;
-		
-		return true;
-		*/
 	}
 
 	/**
@@ -704,7 +579,7 @@ public class TranscodeTask implements Callable<String> {
 			command = hadoop + "fs -copyToLocal /" + this.username + "/" + procesfileName + "/trans/" + splitname + this.outformat + " " + transPath;
 			
 			exit = callexec(rt, command);
-			print("TaskID=" + this.taskid + " " + command);
+			print("TaskID=" + this.taskid + ": " + command);
 			println(": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0)
 				return false;
