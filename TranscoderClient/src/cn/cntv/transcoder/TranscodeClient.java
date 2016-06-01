@@ -13,24 +13,24 @@ import java.io.*;
 import java.lang.Thread;
 
 enum TRANSCODECLIENT_STATUS {
-	START("START",1), TRANSCODING("TRANSCODING",2), WAITING("WAITING",3), ENDING("ENDING",4);
+	START("START", 1), TRANSCODING("TRANSCODING", 2), WAITING("WAITING", 3), ENDING("ENDING", 4);
 	// 成员变量
-    private String name;
-    private int index;
+	private String name;
+	private int index;
 
-    // 构造方法
-    private TRANSCODECLIENT_STATUS(String name, int index) {
-        this.name = name;
-        this.index = index;
-    }
+	// 构造方法
+	private TRANSCODECLIENT_STATUS(String name, int index) {
+		this.name = name;
+		this.index = index;
+	}
 
-    public int getIndex() {
-        return index;
-    }
-    
-    public String getName() {
-        return name;
-    }
+	public int getIndex() {
+		return index;
+	}
+
+	public String getName() {
+		return name;
+	}
 }
 
 public class TranscodeClient {
@@ -84,18 +84,18 @@ public class TranscodeClient {
 			System.out.println("Not enought input parameters, 4 parameters expected!");
 			System.exit(0);
 		}
-			
+
 		// Specify the input directory that include videos to be transcoded.
 		String input_path = args[0];
 		// Specify the output directory that contains the transcoding result.
 		String output_path = args[1];
 		// //Read the input parameters
-		ParaParser.parser(new File(args[2])); 
+		ParaParser.parser(new File(args[2]));
 		// Create the temp directory that contains the index txt.
 		String index_path = output_path + ".temp/index/";
 		// Specify the username
 		String username = args[3];
-		
+
 		makeDir(new File(index_path));
 		// Specify the temp directory that contains the video splits.
 		String splits_path = output_path + ".temp/splits/";
@@ -110,7 +110,7 @@ public class TranscodeClient {
 		File recd = new File(output_path + "log.txt");
 		if (recd.exists())
 			recd.delete();
-		
+
 		File inputFilePath = new File(input_path);
 		File ouputFilePath = new File(output_path);
 		String[] inputList = null;
@@ -122,13 +122,13 @@ public class TranscodeClient {
 		List<String> failFileList = new ArrayList<String>();
 		String regex_video_file_filter = ".*\\.(mp4|MP4|ts|TS|m2ts)";
 		boolean flag = true;
-		
+
 		TRANSCODECLIENT_STATUS status = TRANSCODECLIENT_STATUS.START;
-		
+
 		while (true) {
-			ParaParser.parser(new File(args[2])); //Read the input parameters
-			
-			switch(status) {
+			ParaParser.parser(new File(args[2])); // Read the input parameters
+
+			switch (status) {
 			case START:
 				// Scan the input directory to find out all video files.
 				inputList = inputFilePath.list(filter(regex_video_file_filter));
@@ -138,44 +138,48 @@ public class TranscodeClient {
 					TranscodeClient.renameFile(input_path, fileName, newFileName);
 				}
 				inputList = inputFilePath.list(filter(regex_video_file_filter));
-				
-				// Check the output directory to find out all successful transcoded videos in order to skip them.
+
+				// Check the output directory to find out all successful
+				// transcoded videos in order to skip them.
 				outputList = ouputFilePath.list(filter(regex_video_file_filter));
 				outputFileList = Arrays.asList(outputList);
-				
+
 				// add the fail task's filename to the fail file list.
 				for (Future<String> failFileName : failTaskList) {
-					try{
+					try {
 						failFileList.add(failFileName.get());
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
 				}
-				
-				// if the output file name contains uuid, then replace them with "{UUID}"
+
+				// if the output file name contains uuid, then replace them with
+				// "{UUID}"
 				for (int i = 0; i < outputFileList.size(); ++i) {
-					outputFileList.set(i,outputFileList.get(i).replaceAll("[0-9|a-z]{32}", "{UUID}"));
+					outputFileList.set(i, outputFileList.get(i).replaceAll("[0-9|a-z]{32}", "{UUID}"));
 				}
-				
-				// check that whether the output path already contains the corresponding file.
+
+				// check that whether the output path already contains the
+				// corresponding file.
 				for (String fileName : inputList) {
 					String input_filename = fileName.substring(0, fileName.lastIndexOf("."));
 					String output_filename = ParaParser.getOutputFilename();
 					output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
 					output_filename = output_filename + ParaParser.getFileoutFormat();
-					
+
 					if (outputFileList.contains(output_filename)) {
-						//System.out.println(output_filename + " exists! check output path!");
+						// System.out.println(output_filename + " exists! check
+						// output path!");
 					} else if (failFileList.contains(fileName)) {
-						//System.out.println(fileName + " transcode fails!");
+						// System.out.println(fileName + " transcode fails!");
 					} else {
 						taskFileList.add(fileName);
 					}
 				}
-				
+
 				status = TRANSCODECLIENT_STATUS.TRANSCODING;
 				break;
-				
+
 			case TRANSCODING:
 				// Initialize the thread pool.
 				ExecutorService es = Executors.newFixedThreadPool(2);
@@ -185,12 +189,14 @@ public class TranscodeClient {
 					String parameter = ParaParser.getParameter();
 					String output_format = ParaParser.getFileoutFormat();
 					String output_filename = ParaParser.getOutputFilename();
-					
+
 					String input_filename = fileName.substring(0, fileName.lastIndexOf("."));
 					output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
-					output_filename = output_filename.replaceAll("\\{UUID\\}", UUID.randomUUID().toString().replaceAll("-", ""));
-					
-					failTaskList.add(es.submit(new TranscodeTask(input_path, fileName, output_path, index_path, splits_path, trans_path, dtshd_path, parameter, output_filename, output_format, username)));
+					output_filename = output_filename.replaceAll("\\{UUID\\}",
+							UUID.randomUUID().toString().replaceAll("-", ""));
+
+					failTaskList.add(es.submit(new TranscodeTask(input_path, fileName, output_path, index_path,
+							splits_path, trans_path, dtshd_path, parameter, output_filename, output_format, username)));
 				}
 				es.shutdown();
 				try {
@@ -198,12 +204,12 @@ public class TranscodeClient {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-				
+
 				taskFileList.clear();
 				status = TRANSCODECLIENT_STATUS.WAITING;
 				flag = true;
 				break;
-				
+
 			case WAITING:
 				// Scan the input directory to find out all video files.
 				inputList = inputFilePath.list(filter(regex_video_file_filter));
@@ -214,17 +220,20 @@ public class TranscodeClient {
 				}
 				inputList = inputFilePath.list(filter(regex_video_file_filter));
 				inputFileList = Arrays.asList(inputList);
-				
-				// Check the output directory to find out all successful transcoded videos in order to skip them.
+
+				// Check the output directory to find out all successful
+				// transcoded videos in order to skip them.
 				outputList = ouputFilePath.list(filter(regex_video_file_filter));
 				outputFileList = Arrays.asList(outputList);
-				
+
 				// add the fail task's filename to the fail file list.
 				for (int i = 0; i < failTaskList.size();) {
-					try{
-						if (inputFileList.contains(failTaskList.get(i).get())) { // if the failed video file still in the input path, do nothing.
+					try {
+						if (inputFileList.contains(failTaskList.get(i).get())) { 
+                            // if the failed video file still in the input path, do nothing.
 							++i;
-						} else { // if the failed video file is removed from the input path, then forget it.
+						} else { 
+                            // if the failed video file is removed from the input path, then forget it.
 							failTaskList.remove(i);
 							continue;
 						}
@@ -232,28 +241,30 @@ public class TranscodeClient {
 						e.printStackTrace();
 					}
 				}
-				
+
 				failFileList.clear();
 				for (Future<String> failFileName : failTaskList) {
-					try{
+					try {
 						failFileList.add(failFileName.get());
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
 				}
-				
-				// if the output file name contains uuid, then replace them with "{UUID}"
+
+				// if the output file name contains uuid, then replace them with
+				// "{UUID}"
 				for (int i = 0; i < outputFileList.size(); ++i) {
-					outputFileList.set(i,outputFileList.get(i).replaceAll("[0-9|a-z]{32}", "{UUID}"));
+					outputFileList.set(i, outputFileList.get(i).replaceAll("[0-9|a-z]{32}", "{UUID}"));
 				}
-				
-				// check that whether the output path already contains the corresponding file.
+
+				// check that whether the output path already contains the
+				// corresponding file.
 				for (String fileName : inputList) {
 					String input_filename = fileName.substring(0, fileName.lastIndexOf("."));
 					String output_filename = ParaParser.getOutputFilename();
 					output_filename = output_filename.replaceAll("\\{original_filename\\}", input_filename);
 					output_filename = output_filename + ParaParser.getFileoutFormat();
-					
+
 					if (outputFileList.contains(output_filename)) {
 						if (flag == true) {
 							System.out.println(output_filename + " exists! check output path!");
@@ -266,7 +277,7 @@ public class TranscodeClient {
 						taskFileList.add(fileName);
 					}
 				}
-				
+
 				if (taskFileList.isEmpty()) {
 					status = TRANSCODECLIENT_STATUS.ENDING;
 					flag = false;
@@ -278,9 +289,9 @@ public class TranscodeClient {
 				} else {
 					status = TRANSCODECLIENT_STATUS.TRANSCODING;
 				}
-				
+
 				break;
-				
+
 			case ENDING:
 				return;
 			}

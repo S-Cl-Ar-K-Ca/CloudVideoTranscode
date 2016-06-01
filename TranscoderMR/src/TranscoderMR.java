@@ -16,26 +16,26 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 public class TranscoderMR {
 	public static class TranscodeMapper extends Mapper<LongWritable, Text, Text, BooleanWritable> {
 		synchronized private void print(String[] msg) {
-			for (int i = 0; i<msg.length; ++i) {
+			for (int i = 0; i < msg.length; ++i) {
 				this.print(msg[i] + " ");
 			}
 		}
-		
+
 		synchronized private void println(String[] msg) {
-			for (int i = 0; i<msg.length; ++i) {
+			for (int i = 0; i < msg.length; ++i) {
 				this.print(msg[i] + " ");
 			}
 			this.println("");
 		}
-		
+
 		synchronized private void print(String msg) {
 			System.out.print(msg);
 		}
-		
+
 		synchronized private void println(String msg) {
 			System.out.println(msg);
 		}
-		
+
 		// Create a path
 		public static void makeDir(File dir) {
 			if (!dir.getParentFile().exists()) {
@@ -43,7 +43,7 @@ public class TranscoderMR {
 			}
 			dir.mkdir();
 		}
-		
+
 		/**
 		 * 删除单个文件
 		 * 
@@ -61,52 +61,52 @@ public class TranscoderMR {
 			}
 			return flag;
 		}
-		
+
 		public int callexec(Runtime rt, String[] command) {
-			return this.callexec(rt, command, null); 
+			return this.callexec(rt, command, null);
 		}
-		
+
 		public int callexec(Runtime rt, String[] command, OutputStream outputStream) {
 			Process process = null;
 			int result = -1;
 			try {
 				process = rt.exec(command);
-				//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
-				new StreamGobbler(process.getErrorStream(),"ERROR", outputStream).start();
-				new StreamGobbler(process.getInputStream(),"INPUT", outputStream).start();
+				// 启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+				new StreamGobbler(process.getErrorStream(), "ERROR", outputStream).start();
+				new StreamGobbler(process.getInputStream(), "INPUT", outputStream).start();
 				result = process.waitFor();
 			} catch (IOException e) {
 				e.printStackTrace();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			} finally {
-				if(process!=null&&result!=0){
+				if (process != null && result != 0) {
 					process.destroy();
 				}
 			}
-			
+
 			return result;
 		}
-		
+
 		public int callexec(Runtime rt, String command, OutputStream outputStream) {
 			Process process = null;
 			int result = -1;
 			try {
 				process = rt.exec(command);
-				//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
-				new StreamGobbler(process.getErrorStream(),"ERROR", outputStream).start();
-				new StreamGobbler(process.getInputStream(),"INPUT", outputStream).start();
+				// 启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+				new StreamGobbler(process.getErrorStream(), "ERROR", outputStream).start();
+				new StreamGobbler(process.getInputStream(), "INPUT", outputStream).start();
 				result = process.waitFor();
 			} catch (IOException e) {
 				e.printStackTrace();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			} finally {
-				if(process!=null&&result!=0){
+				if (process != null && result != 0) {
 					process.destroy();
 				}
 			}
-			
+
 			return result;
 		}
 
@@ -124,7 +124,7 @@ public class TranscoderMR {
 			String splitName = line.substring(0, line.lastIndexOf("@"));
 			String parameter = line.substring(line.lastIndexOf("@") + 1, line.lastIndexOf("&"));
 			String outformat = line.substring(line.lastIndexOf("&") + 1, line.lastIndexOf("$"));
-			String username  = line.substring(line.lastIndexOf("$") + 1, line.length());
+			String username = line.substring(line.lastIndexOf("$") + 1, line.length());
 
 			System.out.println("start to transcode " + splitName);
 
@@ -139,35 +139,32 @@ public class TranscoderMR {
 			String localTransPath = "/home/" + username + "/trans/";
 			TranscodeMapper.makeDir(new File(localSplitPath));
 			TranscodeMapper.makeDir(new File(localTransPath));
-			
+
 			int exit = 0;
 
 			try {
-				// step 00: delete the possible file in split path. 
+				// step 00: delete the possible file in split path.
 				TranscodeMapper.deleteFile(localSplitPath + splitName);
-				
+
 				// step 01: copy a split file to local datanode
 				command = hadoop + "fs -copyToLocal " + splitPath + splitName + " " + localSplitPath;
 				exit = callexec(rt, command);
 				System.out.println(command + ": " + (exit == 0 ? "Success" : "Fail"));
 
 				// step 02: transcode the video
-				//command = ffmpeg + "-y -i" + " " + localSplitPath + splitName + " " + parameter + " " + localTransPath + splitName + outformat;
 				cmds.clear();
-				cmds.add(ffmpeg); 
-				cmds.add("-i"); cmds.add(localSplitPath + splitName);
+				cmds.add(ffmpeg);
+				cmds.add("-i");
+				cmds.add(localSplitPath + splitName);
 				String[] para = parameter.split(" ");
 				for (String str_i : para) {
 					cmds.add(str_i);
 				}
-				cmds.add("-y"); cmds.add(localTransPath + splitName + outformat);
+				cmds.add("-y");
+				cmds.add(localTransPath + splitName + outformat);
 				command_array = new String[cmds.size()];
 				command_array = cmds.toArray(command_array);
-				
-				//for (int i=0; i<command_array.length; ++i) {
-				//	System.out.print(command_array[i] + " ");
-				//}
-				
+
 				print(command_array);
 				exit = callexec(rt, command_array);
 				println(": " + (exit == 0 ? "Success" : "Fail"));

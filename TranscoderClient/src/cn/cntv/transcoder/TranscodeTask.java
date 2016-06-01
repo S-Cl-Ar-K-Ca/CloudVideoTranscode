@@ -17,42 +17,45 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
 enum TRANSCODE_ERROR_CODE {
-	SUCCESS("SUCCESS",0),
-	OPEN_LOG_FILE_FAIL("OPEN_LOG_FILE_FAIL",1), 
-	CLEAR_LOCAL_TEMP_PATH_FAIL("CLEAR_LOCAL_TEMP_PATH_FAIL",2), 
-	CREATE_WORK_PATH_ON_HADOOP_FAIL("CREATE_WORK_PATH_ON_HADOOP_FAIL",3),
-	SPLIT_VIDEO_FAIL("SPLIT_VIDEO_FAIL",4),
-	COPY_FILE_TO_HADOOP_FAIL("COPY_FILE_TO_HADOOP_FAIL",5),
-	TRANSCODE_ON_HADOOP_FAIL("TRANSCODE_ON_HADOOP_FAIL",6),
-	COPY_FILE_TO_LOCAL_FAIL("COPY_FILE_TO_LOCAL_FAIL",7),
-	ASSEMBLE_VIDEO_FAIL("ASSEMBLE_VIDEO_FAIL",8),
-	RENAME_OUTPUT_FILE_FAIL("RENAME_OUTPUT_FILE_FAIL",9),
-	ENABLE_DTS_FAIL("ENABLE_DTS_FAIL",10),
-	MOVE_TO_OUTPUT_PATH_FAIL("MOVE_TO_OUTPUT_PATH_FAIL",11);
-	
+	SUCCESS("SUCCESS", 0), 
+	OPEN_LOG_FILE_FAIL("OPEN_LOG_FILE_FAIL", 1), 
+	CLEAR_LOCAL_TEMP_PATH_FAIL("CLEAR_LOCAL_TEMP_PATH_FAIL", 2), 
+	CREATE_WORK_PATH_ON_HADOOP_FAIL("CREATE_WORK_PATH_ON_HADOOP_FAIL", 3), 
+	SPLIT_VIDEO_FAIL("SPLIT_VIDEO_FAIL", 4), 
+	COPY_FILE_TO_HADOOP_FAIL("COPY_FILE_TO_HADOOP_FAIL", 5), 
+	TRANSCODE_ON_HADOOP_FAIL("TRANSCODE_ON_HADOOP_FAIL", 6), 
+	COPY_FILE_TO_LOCAL_FAIL("COPY_FILE_TO_LOCAL_FAIL", 7), 
+	ASSEMBLE_VIDEO_FAIL("ASSEMBLE_VIDEO_FAIL", 8), 
+	RENAME_OUTPUT_FILE_FAIL("RENAME_OUTPUT_FILE_FAIL", 9), 
+	ENABLE_DTS_FAIL("ENABLE_DTS_FAIL", 10), 
+	MOVE_TO_OUTPUT_PATH_FAIL("MOVE_TO_OUTPUT_PATH_FAIL", 11);
+
 	// 成员变量
-    private String name;
-    private int index;
+	private String name;
+	private int index;
 
-    // 构造方法
-    private TRANSCODE_ERROR_CODE(String name, int index) {
-        this.name = name;
-        this.index = index;
-    }
+	// 构造方法
+	private TRANSCODE_ERROR_CODE(String name, int index) {
+		this.name = name;
+		this.index = index;
+	}
 
-    public int getIndex() {
-        return index;
-    }
-    
-    public String getName() {
-        return name;
-    }
+	public int getIndex() {
+		return index;
+	}
+
+	public String getName() {
+		return name;
+	}
 }
 
 public class TranscodeTask implements Callable<String> {
 	private String inputPath;
-	private String originFileName; // original file name, may contain special characters.
-	private String procesfileName; // currently processing file name.
+	// original file name, may contain special characters.
+	private String originFileName;
+	// currently processing file name.
+	private String procesfileName;
+	
 	private String outputPath;
 	private String indexPath;
 	private String splitPath;
@@ -71,21 +74,24 @@ public class TranscodeTask implements Callable<String> {
 	synchronized private void print(String msg) {
 		System.out.print(msg);
 	}
-	
+
 	synchronized private void println(String msg) {
 		System.out.println(msg);
 	}
 
 	public static boolean renameFile(String path, String oldname, String newname) {
-		if (!oldname.equals(newname)) {// 新的文件名和以前文件名不同时,才有必要进行重命名
+		if (!oldname.equals(newname)) {
+			// 新的文件名和以前文件名不同时,才有必要进行重命名
 			File oldfile = new File(path + oldname);
 			File newfile = new File(path + newname);
 			if (!oldfile.exists()) {
-				return false; // 重命名文件不存在
-			}
-			if (newfile.exists())// 若在该目录下已经有一个文件和新文件名相同，则不允许重命名
 				return false;
-			else {
+				// 重命名文件不存在
+			}
+			if (newfile.exists()) {
+				// 若在该目录下已经有一个文件和新文件名相同，则不允许重命名
+				return false;
+			} else {
 				oldfile.renameTo(newfile);
 			}
 		} else {
@@ -156,52 +162,52 @@ public class TranscodeTask implements Callable<String> {
 			}
 		};
 	}
-	
+
 	public int callexec(Runtime rt, String[] command) {
-		return this.callexec(rt, command, null); 
+		return this.callexec(rt, command, null);
 	}
-	
+
 	public int callexec(Runtime rt, String[] command, OutputStream outputStream) {
 		Process process = null;
 		int result = -1;
 		try {
 			process = rt.exec(command);
-			//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
-			new StreamGobbler(process.getErrorStream(),"ERROR", outputStream).start();
-			new StreamGobbler(process.getInputStream(),"INPUT", outputStream).start();
+			// 启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+			new StreamGobbler(process.getErrorStream(), "ERROR", outputStream).start();
+			new StreamGobbler(process.getInputStream(), "INPUT", outputStream).start();
 			result = process.waitFor();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} finally {
-			if(process!=null&&result!=0){
+			if (process != null && result != 0) {
 				process.destroy();
 			}
 		}
-		
+
 		return result;
 	}
-	
+
 	public int callexec(Runtime rt, String command, OutputStream outputStream) {
 		Process process = null;
 		int result = -1;
 		try {
 			process = rt.exec(command);
-			//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
-			new StreamGobbler(process.getErrorStream(),"ERROR", outputStream).start();
-			new StreamGobbler(process.getInputStream(),"INPUT", outputStream).start();
+			// 启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+			new StreamGobbler(process.getErrorStream(), "ERROR", outputStream).start();
+			new StreamGobbler(process.getInputStream(), "INPUT", outputStream).start();
 			result = process.waitFor();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} finally {
-			if(process!=null&&result!=0){
+			if (process != null && result != 0) {
 				process.destroy();
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -210,7 +216,8 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	public TranscodeTask(String inputPath, String fileName, String outputPath, String indexPath, String splitPath,
-			String transPath, String dtshd_path, String parameter, String output_filename, String outformat, String username) {
+			String transPath, String dtshd_path, String parameter, String output_filename, String outformat,
+			String username) {
 		this.inputPath = inputPath;
 		this.originFileName = fileName;
 		String filetype = fileName.substring(fileName.lastIndexOf("."), fileName.length());
@@ -231,8 +238,10 @@ public class TranscodeTask implements Callable<String> {
 		boolean flag = false;
 		try {
 			flag = TranscodeTask.renameFile(this.inputPath, this.originFileName, this.procesfileName);
-			if (flag == false)
-				return this.originFileName; // fail,can not rename the original video file.
+			if (flag == false) {
+				return this.originFileName; 
+				// fail,can not rename the original video file.
+			}
 			code = transcode();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -240,11 +249,13 @@ public class TranscodeTask implements Callable<String> {
 			e.printStackTrace();
 		} finally {
 			flag = TranscodeTask.renameFile(this.inputPath, this.procesfileName, this.originFileName);
-			if (flag == false)
-				return this.originFileName; // fail,can not rename back the video file in input path
+			if (flag == false){
+				return this.originFileName; 
+				// fail,can not rename back the video file in input path
+			}
 		}
 
-		return code == 0?"":this.originFileName;
+		return code == 0 ? "" : this.originFileName;
 	}
 
 	private boolean clear_local_path() {
@@ -252,7 +263,7 @@ public class TranscodeTask implements Callable<String> {
 		clearDir(new File(splitPath));
 		return true;
 	}
-	
+
 	private boolean clear_cluster() throws IOException, InterruptedException {
 		String hadoop = "/opt/hadoop/hadoop-2.7.1/bin/hadoop ";
 		String command = null;
@@ -262,7 +273,8 @@ public class TranscodeTask implements Callable<String> {
 		command = hadoop + "fs -rm -r /" + this.username + "/" + procesfileName;
 		exit = callexec(rt, command);
 		print("TaskID=" + this.taskid + ": " + command);
-		println(": " + (exit == 0 ? "Success" : "Success")); //print success what ever
+		println(": " + (exit == 0 ? "Success" : "Success")); 
+		// print success what ever
 		return true;
 	}
 
@@ -275,7 +287,8 @@ public class TranscodeTask implements Callable<String> {
 		command = hadoop + "fs -rm -r /" + this.username + "/" + procesfileName;
 		exit = callexec(rt, command);
 		print("TaskID=" + this.taskid + ": " + command);
-		println(": " + (exit == 0 ? "Success" : "Success")); //print success what ever
+		println(": " + (exit == 0 ? "Success" : "Success")); 
+		// print success what ever
 
 		command = hadoop + "fs -mkdir -p /" + this.username + "/" + procesfileName + "/split";
 		exit = callexec(rt, command);
@@ -299,10 +312,12 @@ public class TranscodeTask implements Callable<String> {
 		String command = null;
 		Runtime rt = Runtime.getRuntime();
 		int exit = 0;
-		
-		String file_type = this.procesfileName.substring(this.procesfileName.lastIndexOf("."),this.procesfileName.length());
-		
-		command = "mkvmerge -o " + this.splitPath + this.procesfileName + ".split%04d" + file_type + " --split " + ParaParser.getSplitSize() + fileFullName;
+
+		String file_type = this.procesfileName.substring(this.procesfileName.lastIndexOf("."),
+				this.procesfileName.length());
+
+		command = "mkvmerge -o " + this.splitPath + this.procesfileName + ".split%04d" + file_type + " --split "
+				+ ParaParser.getSplitSize() + fileFullName;
 		exit = callexec(rt, command);
 		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
@@ -333,22 +348,25 @@ public class TranscodeTask implements Callable<String> {
 
 		for (String splitname : splitList) {
 			// copy the index videos to hadoop cluster
-			command = hadoop + "fs -copyFromLocal -f " + indexPath + splitname + ".idx /" + this.username + "/" + procesfileName + "/index";
-			
+			command = hadoop + "fs -copyFromLocal -f " + indexPath + splitname + ".idx /" + this.username + "/"
+					+ procesfileName + "/index";
+
 			exit = callexec(rt, command);
-			//print("TaskID=" + this.taskid + ": " + command);
-			//println(": " + (exit == 0 ? "Success" : "Fail"));
-			if (exit != 0)
+
+			if (exit != 0) {
 				return false;
+			}
 
 			// copy the splits videos to hadoop cluster
-			command = hadoop + "fs -copyFromLocal -f " + splitPath + splitname + " /" + this.username + "/" + procesfileName + "/split";
-			
+			command = hadoop + "fs -copyFromLocal -f " + splitPath + splitname + " /" + this.username + "/"
+					+ procesfileName + "/split";
+
 			exit = callexec(rt, command);
 			print("TaskID=" + this.taskid + ": " + command);
 			println(": " + (exit == 0 ? "Success" : "Fail"));
-			if (exit != 0)
-				return false;
+			if (exit != 0) {
+				return false; 
+			}
 		}
 
 		return true;
@@ -364,8 +382,9 @@ public class TranscodeTask implements Callable<String> {
 		exit = callexec(rt, command);
 
 		// step 06: start transcode, and waiting for its completion.
-		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /" + this.username + "/" + procesfileName + "/index /" + this.username + "/" + procesfileName + "/trans";
-		
+		command = hadoop + "jar /home/bin/tc.jar TranscoderMR /" + this.username + "/" + procesfileName + "/index /"
+				+ this.username + "/" + procesfileName + "/trans";
+
 		exit = callexec(rt, command);
 		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
@@ -394,25 +413,29 @@ public class TranscodeTask implements Callable<String> {
 				outTxt.write(newline.getBytes());
 				outTxt.close();
 			} catch (FileNotFoundException e) {
-				return TRANSCODE_ERROR_CODE.OPEN_LOG_FILE_FAIL.getIndex(); // can not open and write the log.txt file.
+				return TRANSCODE_ERROR_CODE.OPEN_LOG_FILE_FAIL.getIndex();
+				// can not open and write the log.txt file.
 			}
 
 			// clear index and split directory.
 			flag = clear_local_path();
 			if (flag == false) {
-				return TRANSCODE_ERROR_CODE.CLEAR_LOCAL_TEMP_PATH_FAIL.getIndex(); // can not clear the local temporary path.
+				return TRANSCODE_ERROR_CODE.CLEAR_LOCAL_TEMP_PATH_FAIL.getIndex();
+				// can not clear the local temporary path.
 			}
 
 			// prepare work directory on hadoop cluster.
 			flag = prepare_cluster();
 			if (flag == false) {
-				return TRANSCODE_ERROR_CODE.CREATE_WORK_PATH_ON_HADOOP_FAIL.getIndex(); // can not create working directory on hadoop
+				return TRANSCODE_ERROR_CODE.CREATE_WORK_PATH_ON_HADOOP_FAIL.getIndex();
+				// can not create working directory on hadoop
 			}
 
 			// use mkvmerge to split the video file.
 			flag = split_video();
 			if (flag == false) {
-				return TRANSCODE_ERROR_CODE.SPLIT_VIDEO_FAIL.getIndex(); // can not split video
+				return TRANSCODE_ERROR_CODE.SPLIT_VIDEO_FAIL.getIndex();
+				// can not split video
 			}
 
 			// scan the splits videos and generate the index files.
@@ -422,7 +445,8 @@ public class TranscodeTask implements Callable<String> {
 			flag = copy_to_cluster(splitList);
 			if (flag == false) {
 				clear_cluster();
-				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_HADOOP_FAIL.getIndex(); // can not copy files to hadoop
+				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_HADOOP_FAIL.getIndex();
+				// can not copy files to hadoop
 			}
 
 		} finally {
@@ -435,35 +459,39 @@ public class TranscodeTask implements Callable<String> {
 			flag = transcode_cloud();
 			if (flag == false) {
 				clear_cluster();
-				return TRANSCODE_ERROR_CODE.TRANSCODE_ON_HADOOP_FAIL.getIndex(); // transcoding process on hadoop fails
+				return TRANSCODE_ERROR_CODE.TRANSCODE_ON_HADOOP_FAIL.getIndex();
+				// transcoding process on hadoop fails
 			}
 		} finally {
 			hadoop_lock.unlock();
 		}
-		
+
 		local_rx_lock.lock();
 		try {
 			// copy the trans videos to client machine
 			boolean flag = false;
 			flag = copy_to_client(hadoop, splitList, rt);
 			if (flag == false) {
-				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_LOCAL_FAIL.getIndex(); // can not copy files to local client
+				return TRANSCODE_ERROR_CODE.COPY_FILE_TO_LOCAL_FAIL.getIndex();
+				// can not copy files to local client
 			}
 
 			// scan the trans path to generate the out.ffconcat.
 			generate_concat();
-			
+
 			// assemble all the splits with ffmpeg
 			flag = assemble_video(rt);
 			if (flag == false) {
-				return TRANSCODE_ERROR_CODE.ASSEMBLE_VIDEO_FAIL.getIndex(); // can not assemble video
+				return TRANSCODE_ERROR_CODE.ASSEMBLE_VIDEO_FAIL.getIndex();
+				// can not assemble video
 			}
-			
-			// enable DTS audio if needed 
+
+			// enable DTS audio if needed
 			if (ParaParser.getAudioDTSEnabled()) {
 				flag = enable_audio_dts(rt);
 				if (flag == false) {
-					return TRANSCODE_ERROR_CODE.ENABLE_DTS_FAIL.getIndex(); // enable dts fail
+					return TRANSCODE_ERROR_CODE.ENABLE_DTS_FAIL.getIndex();
+					// enable dts fail
 				}
 			} else {
 				// do nothing
@@ -471,35 +499,37 @@ public class TranscodeTask implements Callable<String> {
 
 			// move the final result file to the output path and rename it
 			String output_filename = this.output_filename + this.outformat;
-			
+
 			String move_filename1 = this.transPath + this.procesfileName + this.outformat;
-			
+
 			command = "mv " + move_filename1 + " " + this.outputPath + output_filename;
-			exit = callexec(rt,command);
+			exit = callexec(rt, command);
 			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 			if (exit != 0) {
 				return TRANSCODE_ERROR_CODE.RENAME_OUTPUT_FILE_FAIL.getIndex();
 			}
-			
+
 			if (ParaParser.getAudioDTSEnabled()) {
-				String move_filename2 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS.mp4";
-				String move_filename3 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS.mp4.ts";
-				
+				String move_filename2 = this.dtshd_path
+						+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.mp4";
+				String move_filename3 = this.dtshd_path
+						+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.mp4.ts";
+
 				command = "mv " + move_filename2 + " " + this.outputPath + this.output_filename + "_DTS.mp4";
-				exit = callexec(rt,command);
+				exit = callexec(rt, command);
 				println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 				if (exit != 0) {
 					return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
 				}
-			
+
 				command = "mv " + move_filename3 + " " + this.outputPath + this.output_filename + "_DTS.ts";
-				exit = callexec(rt,command);
+				exit = callexec(rt, command);
 				println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 				if (exit != 0) {
 					return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
 				}
 			}
-		} catch (Exception e){
+		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
 			clear_cluster();
@@ -507,36 +537,42 @@ public class TranscodeTask implements Callable<String> {
 		}
 		return TRANSCODE_ERROR_CODE.SUCCESS.getIndex();
 	}
-	
+
 	private boolean enable_audio_dts(Runtime rt) {
 		clearDir(new File(this.dtshd_path));
-		
+
 		String command = null;
 		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		String python = "python3 ";
 		int exit;
-		
+
 		// extract the audio wave file to dtshd path
-		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + "-vn -sn -ar 48k -acodec pcm_s24le " + this.dtshd_path + " " + ParaParser.getAudioTrackSelect() + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".wav";
-		exit = callexec(rt,command);
+		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + "-vn -sn -ar 48k -acodec pcm_s24le "
+				+ this.dtshd_path + " " + ParaParser.getAudioTrackSelect()
+				+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".wav";
+		exit = callexec(rt, command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
-		
-		// copy the video file to dtshd path 
-		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -c:v copy -c:a copy " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4";
-		exit = callexec(rt,command);
+
+		// copy the video file to dtshd path
+		command = ffmpeg + "-y -i " + this.transPath + this.procesfileName + this.outformat + " -c:v copy -c:a copy "
+				+ this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4";
+		exit = callexec(rt, command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
-		
+
 		// call the python script to add DTS track
-		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.mp4 -ts";
-		exit = callexec(rt,command);
+		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path
+				+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o "
+				+ this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf("."))
+				+ "_DTS.mp4 -ts";
+		exit = callexec(rt, command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
 			return false;
-		
+
 		return true;
 	}
 
@@ -550,13 +586,17 @@ public class TranscodeTask implements Callable<String> {
 		String ffmpeg = "/opt/ffmpeg/ffmpeg-git-20160409-64bit-static/ffmpeg ";
 		int exit;
 		if (this.outformat.intern() == ".mp4".intern()) {
-			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc " + transPath + this.procesfileName + this.outformat;
+			command = ffmpeg + "-f concat -i " + transPath
+					+ "out.ffconcat -vcodec copy -acodec copy -bsf:a aac_adtstoasc " + transPath + this.procesfileName
+					+ this.outformat;
 		} else if (this.outformat.intern() == ".ts".intern()) {
-			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy " + transPath + this.procesfileName + this.outformat;
+			command = ffmpeg + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy " + transPath
+					+ this.procesfileName + this.outformat;
 		} else {
-			command = ffmpeg  + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy " + transPath + this.procesfileName + this.outformat;
+			command = ffmpeg + "-f concat -i " + transPath + "out.ffconcat -vcodec copy -acodec copy " + transPath
+					+ this.procesfileName + this.outformat;
 		}
-		
+
 		exit = callexec(rt, command);
 		print("TaskID=" + this.taskid + ": " + command);
 		println(": " + (exit == 0 ? "Success" : "Fail"));
@@ -585,8 +625,9 @@ public class TranscodeTask implements Callable<String> {
 		int exit;
 		clearDir(new File(transPath));
 		for (String splitname : splitList) {
-			command = hadoop + "fs -copyToLocal /" + this.username + "/" + procesfileName + "/trans/" + splitname + this.outformat + " " + transPath;
-			
+			command = hadoop + "fs -copyToLocal /" + this.username + "/" + procesfileName + "/trans/" + splitname
+					+ this.outformat + " " + transPath;
+
 			exit = callexec(rt, command);
 			print("TaskID=" + this.taskid + ": " + command);
 			println(": " + (exit == 0 ? "Success" : "Fail"));
