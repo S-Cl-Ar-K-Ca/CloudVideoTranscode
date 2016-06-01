@@ -157,6 +157,32 @@ public class TranscodeTask implements Callable<String> {
 		};
 	}
 	
+	public int callexec(Runtime rt, String[] command) {
+		return this.callexec(rt, command, null); 
+	}
+	
+	public int callexec(Runtime rt, String[] command, OutputStream outputStream) {
+		Process process = null;
+		int result = -1;
+		try {
+			process = rt.exec(command);
+			//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
+			new StreamGobbler(process.getErrorStream(),"ERROR", outputStream).start();
+			new StreamGobbler(process.getInputStream(),"INPUT", outputStream).start();
+			result = process.waitFor();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+			if(process!=null&&result!=0){
+				process.destroy();
+			}
+		}
+		
+		return result;
+	}
+	
 	public int callexec(Runtime rt, String command, OutputStream outputStream) {
 		Process process = null;
 		int result = -1;
@@ -180,25 +206,7 @@ public class TranscodeTask implements Callable<String> {
 	}
 
 	public int callexec(Runtime rt, String command) {
-		Process process = null;
-		int result = -1;
-		try {
-			process = rt.exec(command);
-			//启用StreamGobbler线程清理错误流和输入流 防止IO阻塞
-			new StreamGobbler(process.getErrorStream(),"ERROR").start();
-			new StreamGobbler(process.getInputStream(),"INPUT").start();
-			result = process.waitFor();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} finally {
-			if(process!=null&&result!=0){
-				process.destroy();
-			}
-		}
-		
-		return result;
+		return this.callexec(rt, command, null);
 	}
 
 	public TranscodeTask(String inputPath, String fileName, String outputPath, String indexPath, String splitPath,
@@ -307,7 +315,7 @@ public class TranscodeTask implements Callable<String> {
 	private String[] generate_idx() throws FileNotFoundException {
 		String[] splitList = null;
 		File splitVideoPath = new File(splitPath);
-		splitList = splitVideoPath.list(filter(".*\\.(mp4|xxx)"));
+		splitList = splitVideoPath.list(filter(".*\\.(mp4|ts|m2ts)"));
 		Arrays.sort(splitList);
 		for (String splitname : splitList) {
 			PrintWriter outTxt = new PrintWriter(indexPath + splitname + ".idx");
@@ -465,8 +473,6 @@ public class TranscodeTask implements Callable<String> {
 			String output_filename = this.output_filename + this.outformat;
 			
 			String move_filename1 = this.transPath + this.procesfileName + this.outformat;
-			String move_filename2 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4";
-			String move_filename3 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4.ts";
 			
 			command = "mv " + move_filename1 + " " + this.outputPath + output_filename;
 			exit = callexec(rt,command);
@@ -475,20 +481,24 @@ public class TranscodeTask implements Callable<String> {
 				return TRANSCODE_ERROR_CODE.RENAME_OUTPUT_FILE_FAIL.getIndex();
 			}
 			
-			command = "mv " + move_filename2 + " " + this.outputPath + this.output_filename + "_DTS51.mp4";
-			exit = callexec(rt,command);
-			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-			if (exit != 0) {
-				return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
-			}
+			if (ParaParser.getAudioDTSEnabled()) {
+				String move_filename2 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS.mp4";
+				String move_filename3 = this.dtshd_path + this.procesfileName.substring(0,this.procesfileName.lastIndexOf(".")) + "_DTS.mp4.ts";
+				
+				command = "mv " + move_filename2 + " " + this.outputPath + this.output_filename + "_DTS.mp4";
+				exit = callexec(rt,command);
+				println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+				if (exit != 0) {
+					return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
+				}
 			
-			command = "mv " + move_filename3 + " " + this.outputPath + this.output_filename + "_DTS51.ts";
-			exit = callexec(rt,command);
-			println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
-			if (exit != 0) {
-				return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
+				command = "mv " + move_filename3 + " " + this.outputPath + this.output_filename + "_DTS.ts";
+				exit = callexec(rt,command);
+				println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
+				if (exit != 0) {
+					return TRANSCODE_ERROR_CODE.MOVE_TO_OUTPUT_PATH_FAIL.getIndex();
+				}
 			}
-			
 		} catch (Exception e){
 			e.printStackTrace();
 		} finally {
@@ -507,7 +517,7 @@ public class TranscodeTask implements Callable<String> {
 		int exit;
 		
 		// extract the audio wave file to dtshd path
-		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + " -ar 48k -acodec pcm_s24le " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".wav";
+		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + "-vn -sn -ar 48k -acodec pcm_s24le " + this.dtshd_path + " " + ParaParser.getAudioTrackSelect() + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".wav";
 		exit = callexec(rt,command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
@@ -521,7 +531,7 @@ public class TranscodeTask implements Callable<String> {
 			return false;
 		
 		// call the python script to add DTS track
-		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS51.mp4 -ts";
+		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o " + this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.mp4 -ts";
 		exit = callexec(rt,command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)

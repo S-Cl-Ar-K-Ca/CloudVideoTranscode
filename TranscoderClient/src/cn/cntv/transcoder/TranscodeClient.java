@@ -120,7 +120,7 @@ public class TranscodeClient {
 		List<String> taskFileList = new ArrayList<String>();
 		ArrayList<Future<String>> failTaskList = new ArrayList<Future<String>>();
 		List<String> failFileList = new ArrayList<String>();
-		String regex_video_file_filter = ".*\\.(mp4|MP4|ts|TS)";
+		String regex_video_file_filter = ".*\\.(mp4|MP4|ts|TS|m2ts)";
 		boolean flag = true;
 		
 		TRANSCODECLIENT_STATUS status = TRANSCODECLIENT_STATUS.START;

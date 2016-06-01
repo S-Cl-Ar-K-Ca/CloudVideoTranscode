@@ -19,6 +19,7 @@ public class ParaParser {
 	private static String fileout_format = null;
 	private static String output_filename = null;
 	private static String video_codec_type = null;
+	private static String audio_track_select = null;
 	private static boolean audio_dts_enabled = false;
 
 	public static void parser(File inputXml) {
@@ -98,6 +99,15 @@ public class ParaParser {
 						transcode_parameters += "-b:a " + value + " ";
 					}
 					
+					if (name.intern() == "subtitle_select".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-filter_complex [0:v][0:s:" + value + "]overlay[v] -map [v]";
+					}
+					
+					if (name.intern() == "audio_select".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-map 0:a:" + value + " ";
+						audio_track_select = "-map 0:a:" + value + " ";
+					}
+					
 					if (name.intern() == "audio_dts_enabled".intern() && !value.trim().isEmpty()) {
 						if (value.intern() == "yes".intern())
 							audio_dts_enabled = true;
@@ -141,5 +151,9 @@ public class ParaParser {
 	
 	public static String getVideoCodecType() {
 		return ParaParser.video_codec_type;
+	}
+	
+	public static String getAudioTrackSelect() {
+		return ParaParser.audio_track_select;
 	}
 }
