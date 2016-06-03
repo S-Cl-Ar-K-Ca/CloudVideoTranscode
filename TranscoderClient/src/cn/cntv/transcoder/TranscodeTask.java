@@ -513,7 +513,7 @@ public class TranscodeTask implements Callable<String> {
 				String move_filename2 = this.dtshd_path
 						+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.mp4";
 				String move_filename3 = this.dtshd_path
-						+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.mp4.ts";
+						+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + "_DTS.ts";
 
 				command = "mv " + move_filename2 + " " + this.outputPath + this.output_filename + "_DTS.mp4";
 				exit = callexec(rt, command);
@@ -547,8 +547,8 @@ public class TranscodeTask implements Callable<String> {
 		int exit;
 
 		// extract the audio wave file to dtshd path
-		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + "-vn -sn -ar 48k -acodec pcm_s24le "
-				+ this.dtshd_path + " " + ParaParser.getAudioTrackSelect()
+		command = ffmpeg + "-y -i " + this.inputPath + this.procesfileName + " -vn -sn -ar 48k -acodec pcm_s24le "
+				+ ParaParser.getAudioTrackSelect() + this.dtshd_path
 				+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".wav";
 		exit = callexec(rt, command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
@@ -567,7 +567,7 @@ public class TranscodeTask implements Callable<String> {
 		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path
 				+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o "
 				+ this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf("."))
-				+ "_DTS.mp4 -ts";
+				+ "_DTS.mp4 -ao 2 -f 3";
 		exit = callexec(rt, command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)
