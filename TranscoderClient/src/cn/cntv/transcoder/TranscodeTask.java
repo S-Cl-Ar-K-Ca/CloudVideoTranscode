@@ -567,7 +567,7 @@ public class TranscodeTask implements Callable<String> {
 		command = python + "/opt/dts/DTSEncode.py " + this.dtshd_path
 				+ this.procesfileName.substring(0, this.procesfileName.lastIndexOf(".")) + ".mp4" + " -ab 384 -o "
 				+ this.dtshd_path + this.procesfileName.substring(0, this.procesfileName.lastIndexOf("."))
-				+ "_DTS.mp4 -ao 2 -f 3";
+				+ "_DTS.mp4 -ao 0 -f 3";
 		exit = callexec(rt, command);
 		println("TaskID=" + this.taskid + ": " + command + ": " + (exit == 0 ? "Success" : "Fail"));
 		if (exit != 0)

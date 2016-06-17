@@ -100,8 +100,12 @@ public class ParaParser {
 
 					if (name.intern() == "subtitle_select".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-filter_complex [0:v][0:s:" + value + "]overlay[v] -map [v]";
+					} 
+					
+					if (name.intern() == "video_select".intern() && !value.trim().isEmpty()) {
+						transcode_parameters += "-map 0:v:" + value + " ";
 					}
-
+					
 					if (name.intern() == "audio_select".intern() && !value.trim().isEmpty()) {
 						transcode_parameters += "-map 0:a:" + value + " ";
 						audio_track_select = "-map 0:a:" + value + " ";
